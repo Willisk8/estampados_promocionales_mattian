@@ -16,16 +16,24 @@ Uso:
 import argparse
 import hashlib
 import hmac
-import json
 import os
 import sys
 from pathlib import Path
 
 import openpyxl
-import psycopg
 
 sys.path.insert(0, str(Path(__file__).parent))
-from _shared import clean_value, parse_jsonb, file_sha256, load_env, register_batch, complete_batch
+from _shared import (
+    clean_value,
+    file_sha256,
+    load_env,
+    register_batch,
+    register_raw_rows,
+    register_review_items,
+    source_run_name,
+    stable_uuid,
+    complete_batch,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -40,7 +48,9 @@ def read_sheet(wb, sheet_name: str, limit: int | None = None) -> tuple[list[str]
     for i, row in enumerate(rows_iter):
         if limit is not None and i >= limit:
             break
-        records.append(dict(zip(headers, row)))
+        record = dict(zip(headers, row))
+        record["__sheet_row_number"] = i + 2
+        records.append(record)
     return headers, records
 
 
@@ -185,13 +195,37 @@ def insert_canal_contacto(cur, records: list[dict], hmac_secret: str | None) -> 
     return inserted
 
 
+def insert_contactabilidad_desconocida(cur, records: list[dict], source_name: str) -> int:
+    inserted = 0
+    for r in records:
+        canal_id = clean_value(r["id_canal_contacto"])
+        contactabilidad_id = stable_uuid("contactabilidad", canal_id)
+        cur.execute(
+            """
+            INSERT INTO contactabilidad (
+                id_contactabilidad, id_canal_contacto,
+                base_contacto_codigo, evidencia
+            ) VALUES (%s, %s, 'DESCONOCIDA', %s)
+            ON CONFLICT (id_contactabilidad) DO NOTHING
+            """,
+            (
+                contactabilidad_id,
+                canal_id,
+                f"Importacion {source_name}: base legal no confirmada",
+            ),
+        )
+        if cur.rowcount:
+            inserted += 1
+    return inserted
+
+
 # --------------------------------------------------------------------------- #
 # Pipeline principal
 # --------------------------------------------------------------------------- #
 
 def run(file_path: str, limit: int | None, dry_run: bool):
     file_path = str(Path(file_path).resolve())
-    source_name = "entidades_solidarias"
+    source_name = source_run_name("entidades_solidarias", limit)
 
     print(f"Leyendo {file_path}...")
     wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
@@ -223,6 +257,7 @@ def run(file_path: str, limit: int | None, dry_run: bool):
     print(f"  persona:             {len(personas_filtered):>6,}")
     print(f"  persona_organizacion:{len(pers_org_filtered):>6,}")
     print(f"  canal_contacto:      {len(canales_filtered):>6,}")
+    print(f"  contactabilidad:     {len(canales_filtered):>6,}")
     print(f"  Total filas:         {total_rows:>6,}")
 
     if dry_run:
@@ -237,6 +272,8 @@ def run(file_path: str, limit: int | None, dry_run: bool):
     sha256 = file_sha256(file_path)
     print(f"\nSHA-256 del archivo: {sha256[:16]}...")
 
+    import psycopg
+
     with psycopg.connect(db_url) as conn:
         batch_id = register_batch(conn, source_name, file_path, sha256, total_rows)
         if batch_id is None:
@@ -247,6 +284,29 @@ def run(file_path: str, limit: int | None, dry_run: bool):
 
         try:
             with conn.cursor() as cur:
+                print("\nRegistrando trazabilidad import_raw_row...")
+                row_cursor = 1
+                n = register_raw_rows(
+                    cur, batch_id, "organizacion", orgs, row_cursor,
+                    "organizacion", "id_organizacion", "ORGANIZATION",
+                )
+                row_cursor += len(orgs)
+                n += register_raw_rows(
+                    cur, batch_id, "persona", personas_filtered, row_cursor,
+                    "persona", "id_persona", "PERSON",
+                )
+                row_cursor += len(personas_filtered)
+                n += register_raw_rows(
+                    cur, batch_id, "persona_organizacion", pers_org_filtered, row_cursor,
+                    "persona_organizacion", "id_persona_organizacion", "OTHER",
+                )
+                row_cursor += len(pers_org_filtered)
+                n += register_raw_rows(
+                    cur, batch_id, "canal_contacto", canales_filtered, row_cursor,
+                    "canal_contacto", "id_canal_contacto", "OTHER",
+                )
+                print(f"  {n:,} filas raw registradas")
+
                 print("\nInsertando organizacion...")
                 n = insert_organizacion(cur, orgs)
                 print(f"  {n:,} nuevas / {len(orgs) - n:,} ya existían")
@@ -262,6 +322,22 @@ def run(file_path: str, limit: int | None, dry_run: bool):
                 print("Insertando canal_contacto...")
                 n = insert_canal_contacto(cur, canales_filtered, hmac_secret)
                 print(f"  {n:,} nuevas / {len(canales_filtered) - n:,} ya existían")
+
+                print("Insertando contactabilidad DESCONOCIDA...")
+                n = insert_contactabilidad_desconocida(cur, canales_filtered, source_name)
+                print(f"  {n:,} nuevas / {len(canales_filtered) - n:,} ya existían")
+
+                print("Registrando elementos para revision...")
+                n = register_review_items(cur, batch_id, "organizacion", "id_organizacion", orgs)
+                n += register_review_items(cur, batch_id, "persona", "id_persona", personas_filtered)
+                n += register_review_items(
+                    cur,
+                    batch_id,
+                    "persona_organizacion",
+                    "id_persona_organizacion",
+                    pers_org_filtered,
+                )
+                print(f"  {n:,} elementos de revision abiertos")
 
             conn.commit()
             complete_batch(conn, batch_id, "COMPLETED")

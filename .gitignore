@@ -40,6 +40,8 @@ desktop.ini
 # Datos sensibles / PII
 data/export/
 data/backup/
+outputs/
+.artifact_work/
 *.dump
 *.sql.gz
 

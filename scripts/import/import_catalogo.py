@@ -18,10 +18,19 @@ import sys
 from pathlib import Path
 
 import openpyxl
-import psycopg
 
 sys.path.insert(0, str(Path(__file__).parent))
-from _shared import clean_value, parse_jsonb, file_sha256, load_env, register_batch, complete_batch
+from _shared import (
+    clean_value,
+    parse_jsonb,
+    file_sha256,
+    load_env,
+    register_batch,
+    register_raw_rows,
+    register_review_items,
+    source_run_name,
+    complete_batch,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -36,7 +45,9 @@ def read_sheet(wb, sheet_name: str, limit: int | None = None) -> tuple[list[str]
     for i, row in enumerate(rows_iter):
         if limit is not None and i >= limit:
             break
-        records.append(dict(zip(headers, row)))
+        record = dict(zip(headers, row))
+        record["__sheet_row_number"] = i + 2
+        records.append(record)
     return headers, records
 
 
@@ -137,7 +148,7 @@ def insert_precio_proveedor_snapshot(cur, records: list[dict]) -> int:
 
 def run(file_path: str, limit: int | None, dry_run: bool):
     file_path = str(Path(file_path).resolve())
-    source_name = "catalogo_proveedores"
+    source_name = source_run_name("catalogo_proveedores", limit)
 
     print(f"Leyendo {file_path}...")
     wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
@@ -168,6 +179,8 @@ def run(file_path: str, limit: int | None, dry_run: bool):
     sha256 = file_sha256(file_path)
     print(f"\nSHA-256 del archivo: {sha256[:16]}...")
 
+    import psycopg
+
     with psycopg.connect(db_url) as conn:
         batch_id = register_batch(conn, source_name, file_path, sha256, total_rows)
         if batch_id is None:
@@ -178,6 +191,24 @@ def run(file_path: str, limit: int | None, dry_run: bool):
 
         try:
             with conn.cursor() as cur:
+                print("\nRegistrando trazabilidad import_raw_row...")
+                row_cursor = 1
+                n = register_raw_rows(
+                    cur, batch_id, "proveedor", proveedores, row_cursor,
+                    "proveedor", "id_proveedor", "OTHER",
+                )
+                row_cursor += len(proveedores)
+                n += register_raw_rows(
+                    cur, batch_id, "producto_proveedor", productos, row_cursor,
+                    "producto_proveedor", "id_producto_proveedor", "SUPPLIER_PRODUCT",
+                )
+                row_cursor += len(productos)
+                n += register_raw_rows(
+                    cur, batch_id, "precio_proveedor_snapshot", snapshots, row_cursor,
+                    "precio_proveedor_snapshot", "id_snapshot", "SUPPLIER_PRODUCT",
+                )
+                print(f"  {n:,} filas raw registradas")
+
                 print("\nInsertando proveedor...")
                 n = insert_proveedor(cur, proveedores)
                 print(f"  {n:,} nuevos / {len(proveedores) - n:,} ya existían")
@@ -189,6 +220,17 @@ def run(file_path: str, limit: int | None, dry_run: bool):
                 print("Insertando precio_proveedor_snapshot...")
                 n = insert_precio_proveedor_snapshot(cur, snapshots)
                 print(f"  {n:,} nuevos / {len(snapshots) - n:,} ya existían")
+
+                print("Registrando elementos para revision...")
+                n = register_review_items(
+                    cur,
+                    batch_id,
+                    "producto_proveedor",
+                    "id_producto_proveedor",
+                    productos,
+                    "motivo_revision",
+                )
+                print(f"  {n:,} elementos de revision abiertos")
 
             conn.commit()
             complete_batch(conn, batch_id, "COMPLETED")
