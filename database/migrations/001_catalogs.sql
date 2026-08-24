@@ -89,6 +89,7 @@ CREATE POLICY deny_all ON cat_motivo_supresion
 -- ----------------------------------------------------------
 -- Seed inicial de catálogos
 -- ----------------------------------------------------------
+-- ON CONFLICT DO NOTHING garantiza idempotencia si la migración se re-ejecuta.
 INSERT INTO cat_estado_oportunidad (codigo, descripcion) VALUES
     ('NUEVA',        'Oportunidad recién identificada'),
     ('CONTACTADA',   'Se realizó primer contacto'),
@@ -96,7 +97,8 @@ INSERT INTO cat_estado_oportunidad (codigo, descripcion) VALUES
     ('COTIZANDO',    'Cotización en proceso'),
     ('NEGOCIACION',  'En negociación activa'),
     ('GANADA',       'Negocio cerrado exitosamente'),
-    ('PERDIDA',      'Oportunidad no convertida');
+    ('PERDIDA',      'Oportunidad no convertida')
+ON CONFLICT (codigo) DO NOTHING;
 
 INSERT INTO cat_tipo_organizacion (codigo, descripcion) VALUES
     ('FONDO_EMPLEADOS',       'Fondo de empleados'),
@@ -104,7 +106,8 @@ INSERT INTO cat_tipo_organizacion (codigo, descripcion) VALUES
     ('COOPERATIVA',           'Cooperativa'),
     ('MUTUAL',                'Mutual'),
     ('EMPRESA',               'Empresa del sector solidario u otro'),
-    ('OTRO',                  'Otro tipo de organización');
+    ('OTRO',                  'Otro tipo de organización')
+ON CONFLICT (codigo) DO NOTHING;
 
 INSERT INTO cat_base_contacto (codigo, descripcion) VALUES
     ('CONSENTIMIENTO_EXPRESO',    'El titular otorgó consentimiento expreso'),
@@ -112,11 +115,13 @@ INSERT INTO cat_base_contacto (codigo, descripcion) VALUES
     ('DATO_CORPORATIVO',          'Dato público corporativo'),
     ('SOLICITUD_DEL_TITULAR',     'Solicitud iniciada por el titular'),
     ('DESCONOCIDA',               'Base legal no determinada'),
-    ('NO_CONTACTAR',              'Titular solicitó no ser contactado');
+    ('NO_CONTACTAR',              'Titular solicitó no ser contactado')
+ON CONFLICT (codigo) DO NOTHING;
 
 INSERT INTO cat_motivo_supresion (codigo, descripcion) VALUES
     ('UNSUBSCRIBE',         'Solicitud de baja del titular'),
     ('SPAM_COMPLAINT',      'Reporte de spam'),
     ('HARD_BOUNCE',         'Correo inválido o inexistente'),
     ('SOLICITUD_SUPRESION', 'Solicitud formal de supresión (Ley 1581)'),
-    ('BLOQUEO_MANUAL',      'Bloqueo manual por operador');
+    ('BLOQUEO_MANUAL',      'Bloqueo manual por operador')
+ON CONFLICT (codigo) DO NOTHING;

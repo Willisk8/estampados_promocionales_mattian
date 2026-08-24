@@ -43,6 +43,15 @@ data/backup/
 *.dump
 *.sql.gz
 
+# Scraping — datos crudos y procesados contienen PII (NITs, correos, teléfonos)
+scraping/data/raw/
+scraping/data/processed/
+scraping/data/web/
+scraping/outputs/
+scraping/promotional_products/outputs/
+# El código del scraper sí puede versionarse; solo excluir los datos
+# Para incluir el scraper: git add scraping/*.py scraping/requirements.txt etc.
+
 # Outputs temporales (preservar solo lo que está en outputs/ del scraping)
 temp/
 tmp/

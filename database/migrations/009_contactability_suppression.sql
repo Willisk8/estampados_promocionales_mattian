@@ -35,6 +35,7 @@ CREATE TABLE supresion (
     tipo                   TEXT        NOT NULL DEFAULT 'EMAIL'
                            CHECK (tipo IN ('EMAIL','TELEFONO','WHATSAPP')),
     valor_hash             TEXT        NOT NULL,
+    hash_algorithm         TEXT        NOT NULL DEFAULT 'HMAC-SHA256',
     id_motivo_supresion    UUID        REFERENCES cat_motivo_supresion(id),
     motivo_codigo          TEXT        NOT NULL
                            CHECK (motivo_codigo IN (

@@ -7,7 +7,7 @@ CREATE TABLE import_batch (
     id_import_batch        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     source_name            TEXT        NOT NULL,
     source_path            TEXT        NOT NULL,
-    source_sha256          TEXT,
+    source_sha256          TEXT        NOT NULL,
     source_row_count       INTEGER,
     import_status          TEXT        NOT NULL DEFAULT 'CREATED'
                            CHECK (import_status IN (
@@ -22,6 +22,7 @@ ALTER TABLE import_batch ENABLE ROW LEVEL SECURITY;
 CREATE POLICY deny_all ON import_batch
     AS RESTRICTIVE FOR ALL USING (false);
 
+CREATE UNIQUE INDEX uq_import_batch_sha256 ON import_batch (source_name, source_sha256);
 CREATE INDEX idx_import_batch_status ON import_batch (import_status);
 CREATE INDEX idx_import_batch_source ON import_batch (source_name);
 

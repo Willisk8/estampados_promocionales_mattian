@@ -41,6 +41,18 @@ BEGIN
         RETURN;
     END IF;
 
+    -- Verificar que el producto exista y esté en estado ACTIVE.
+    -- Productos en DRAFT/REVIEW_REQUIRED/REVIEWED no son cotizables.
+    IF NOT EXISTS (
+        SELECT 1 FROM producto
+        WHERE id_producto = p_product_id AND estado = 'ACTIVE'
+    ) THEN
+        RETURN QUERY
+            SELECT NULL::NUMERIC(12,2), p_currency, NULL::UUID,
+                   NULL::TEXT, 'PRICE_NOT_FOUND'::TEXT;
+        RETURN;
+    END IF;
+
     -- Buscar precio específico de variante primero (si se proporcionó variante)
     IF p_variant_id IS NOT NULL THEN
         SELECT COUNT(*) INTO v_count

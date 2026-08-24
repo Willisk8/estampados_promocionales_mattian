@@ -30,6 +30,14 @@ CREATE POLICY deny_all ON costo_producto
 CREATE INDEX idx_costo_producto_id   ON costo_producto (id_producto);
 CREATE INDEX idx_costo_variante_id   ON costo_producto (id_variante);
 
+-- Previene costos solapados para el mismo producto/variante/moneda en el mismo período.
+ALTER TABLE costo_producto ADD CONSTRAINT no_solapamiento_costo EXCLUDE USING GIST (
+    id_producto WITH =,
+    COALESCE(id_variante, '00000000-0000-0000-0000-000000000000'::uuid) WITH =,
+    moneda WITH =,
+    vigencia WITH &&
+);
+
 -- ----------------------------------------------------------
 -- precio_producto
 -- Precio de venta propio con escalas por cantidad.
@@ -52,9 +60,12 @@ CREATE TABLE precio_producto (
     -- Mismo producto/variante no puede tener rangos solapados en el mismo período.
     -- COALESCE sobre id_variante: cuando es NULL se reemplaza por un UUID centinela
     -- para que la comparación WITH = funcione correctamente.
+    -- moneda incluida en el constraint: COP y USD son precios independientes
+    -- y no deben colisionar entre sí para el mismo producto/período/rango.
     CONSTRAINT no_solapamiento_precio EXCLUDE USING GIST (
         COALESCE(id_variante, '00000000-0000-0000-0000-000000000000'::uuid) WITH =,
         id_producto WITH =,
+        moneda WITH =,
         quantity_range WITH &&,
         validity WITH &&
     )
