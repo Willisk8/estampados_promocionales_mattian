@@ -181,7 +181,7 @@ def run(file_path: str, limit: int | None, dry_run: bool):
 
     import psycopg
 
-    with psycopg.connect(db_url) as conn:
+    with psycopg.connect(db_url, prepare_threshold=None) as conn:
         batch_id = register_batch(conn, source_name, file_path, sha256, total_rows)
         if batch_id is None:
             print("Este archivo ya fue importado (mismo checksum).")
