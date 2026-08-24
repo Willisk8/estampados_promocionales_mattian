@@ -58,6 +58,8 @@ git status  # No debe aparecer .env.staging
    - `database/migrations/008_crm_organizations_people.sql`
    - `database/migrations/009_contactability_suppression.sql`
    - `database/migrations/010_import_staging.sql`
+   - `database/migrations/011_security_hardening.sql`
+   - `database/migrations/012_revoke_public_execute.sql`
 3. Ejecutar los tests para verificar:
    - `database/tests/test_price_resolution.sql`
    - `database/tests/test_crm_contactability.sql`

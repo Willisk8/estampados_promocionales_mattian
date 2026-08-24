@@ -8,6 +8,7 @@ on:
       - 'database/migrations/**.sql'
       - 'database/tests/**.sql'
       - '.github/workflows/deploy-staging.yml'
+  workflow_dispatch:
 
 jobs:
   migrate:
