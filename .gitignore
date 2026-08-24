@@ -1,0 +1,60 @@
+# Variables de entorno — NUNCA en Git
+.env
+.env.local
+.env.staging
+.env.production
+.env.*.local
+*.env
+
+# Credenciales y secretos
+secrets/
+*.pem
+*.key
+credentials.json
+service_account*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Node
+node_modules/
+npm-debug.log*
+*.tgz
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Datos sensibles / PII
+data/export/
+data/backup/
+*.dump
+*.sql.gz
+
+# Outputs temporales (preservar solo lo que está en outputs/ del scraping)
+temp/
+tmp/
+scratch/
+
+# IDEs
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Supabase CLI (si se usa en el futuro)
+.supabase/
+supabase/.branches/
+supabase/seed.sql
