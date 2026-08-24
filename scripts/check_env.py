@@ -7,7 +7,6 @@ import sys
 
 REQUIRED_VARS = [
     ("SUPABASE_URL", "Supabase Dashboard → Settings → API → Project URL"),
-    ("SUPABASE_ANON_KEY", "Supabase Dashboard → Settings → API → anon public"),
     ("SUPABASE_SERVICE_ROLE_KEY", "Supabase Dashboard → Settings → API → service_role"),
     ("DATABASE_URL", "Supabase Dashboard → Settings → Database → Connection string"),
     ("HMAC_SUPPRESSION_SECRET", "Generar: python -c \"import secrets; print(secrets.token_hex(32))\""),

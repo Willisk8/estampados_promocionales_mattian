@@ -10,17 +10,17 @@ INSERT INTO organizacion (
     id_organizacion, nit, nombre_legal, sigla, tipo_entidad_origen
 ) VALUES (
     '00000000-0000-4000-b000-000000000001',
-    '860013476',
-    'FONDO DE EMPLEADOS DE LA ASOCIACION BANCARIA',
-    'FEDEABC',
-    'Fondos de empleados'
+    '999000001',
+    'ORGANIZACION SINTETICA DE PRUEBA CRM',
+    'TESTCRM',
+    'Fixture sintetico'
 );
 
 INSERT INTO persona (
     id_persona, nombre_completo
 ) VALUES (
     '00000000-0000-4000-b000-000000000002',
-    'FEDERICO ORLANDO CASTRO NAVARRO'
+    'PERSONA SINTETICA DE PRUEBA'
 );
 
 INSERT INTO persona_organizacion (
@@ -41,9 +41,9 @@ INSERT INTO canal_contacto (
     '00000000-0000-4000-b000-000000000004',
     '00000000-0000-4000-b000-000000000001',
     'EMAIL',
-    'Contacto@Fedeabc.com',
-    'contacto@fedeabc.com',
-    'hash-fixture-contacto-fedeabc',
+    'Contacto@Testcrm.example',
+    'contacto@testcrm.example',
+    'hash-fixture-contacto-testcrm',
     'fixture',
     'HIGH'
 );
@@ -81,7 +81,7 @@ DO $$
 DECLARE
     r RECORD;
 BEGIN
-    SELECT * INTO r FROM fn_email_eligible_for_campaign('hash-fixture-contacto-fedeabc');
+    SELECT * INTO r FROM fn_email_eligible_for_campaign('hash-fixture-contacto-testcrm');
     ASSERT r.eligible = false, 'unknown contactability should not be eligible';
     ASSERT r.reason = 'CONTACTABILITY_NOT_CONFIRMED',
         'expected CONTACTABILITY_NOT_CONFIRMED, got ' || COALESCE(r.reason, 'NULL');
@@ -93,7 +93,7 @@ INSERT INTO supresion (
     tipo, valor_hash, motivo_codigo, fuente
 ) VALUES (
     'EMAIL',
-    'hash-fixture-contacto-fedeabc',
+    'hash-fixture-contacto-testcrm',
     'UNSUBSCRIBE',
     'fixture'
 );
@@ -102,7 +102,7 @@ DO $$
 DECLARE
     r RECORD;
 BEGIN
-    SELECT * INTO r FROM fn_email_eligible_for_campaign('hash-fixture-contacto-fedeabc');
+    SELECT * INTO r FROM fn_email_eligible_for_campaign('hash-fixture-contacto-testcrm');
     ASSERT r.eligible = false, 'suppressed email should not be eligible';
     ASSERT r.reason = 'SUPPRESSED',
         'expected SUPPRESSED, got ' || COALESCE(r.reason, 'NULL');
