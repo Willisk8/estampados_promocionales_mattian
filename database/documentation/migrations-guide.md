@@ -21,22 +21,16 @@ Aplicar en orden numérico estricto. Cada migración depende de las anteriores.
 ## Cómo aplicar en Supabase Staging
 
 ```bash
-# Desde el SQL Editor de Supabase o via psql:
-psql "$SUPABASE_DB_URL" -f database/migrations/000_extensions.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/001_catalogs.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/002_products.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/003_product_variants.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/004_supplier_catalog.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/005_supplier_product_mapping.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/006_prices_costs.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/007_price_resolution.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/008_crm_organizations_people.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/009_contactability_suppression.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/010_import_staging.sql
+# Requiere DATABASE_URL en el entorno.
+pwsh ./scripts/apply_pending_migrations.ps1
 ```
 
 > NUNCA incluir credenciales en archivos versionados.
 > Usar variables de entorno o Supabase Vault.
+
+El despliegue automático a STAGING vive en `.github/workflows/deploy-staging.yml`.
+Se activa con push a la rama `staging` y requiere el secret
+`SUPABASE_STAGING_DATABASE_URL`.
 
 ## Cómo agregar una nueva migración
 
@@ -84,8 +78,7 @@ También hay pruebas CRM/contactabilidad en `database/tests/test_crm_contactabil
 Se ejecutan dentro de una transacción que termina en `ROLLBACK` para no afectar datos.
 
 ```bash
-psql "$SUPABASE_DB_URL" -f database/tests/test_price_resolution.sql
-psql "$SUPABASE_DB_URL" -f database/tests/test_crm_contactability.sql
+pwsh ./scripts/run_db_tests.ps1
 ```
 
 El output esperado es una serie de `NOTICE` con `PASSED` para cada caso:

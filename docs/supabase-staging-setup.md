@@ -38,7 +38,13 @@ git status  # No debe aparecer .env.staging
 
 ## Paso 4 — Aplicar migraciones
 
-### Opción A: SQL Editor de Supabase (más simple para STAGING)
+### Opción A: CD automático desde GitHub Actions
+1. En GitHub ir a Settings -> Secrets and variables -> Actions.
+2. Crear el secret `SUPABASE_STAGING_DATABASE_URL` con el connection string de Postgres STAGING.
+3. Hacer push a la rama `staging`.
+4. El workflow `Deploy Staging` aplica solo migraciones pendientes y corre tests.
+
+### Opción B: SQL Editor de Supabase (manual)
 1. Ir al SQL Editor en el dashboard de Supabase
 2. Aplicar cada archivo en orden:
    - `database/migrations/000_extensions.sql`
@@ -56,20 +62,16 @@ git status  # No debe aparecer .env.staging
    - `database/tests/test_price_resolution.sql`
    - `database/tests/test_crm_contactability.sql`
 
-### Opción B: psql desde terminal
+### Opción C: psql desde terminal
 ```bash
 # Cargar variables de entorno
 export $(cat .env.staging | grep -v '^#' | xargs)
 
-# Aplicar migraciones en orden
-for f in database/migrations/*.sql; do
-    echo "Aplicando $f..."
-    psql "$DATABASE_URL" -f "$f"
-done
+# Aplicar solo migraciones pendientes
+pwsh ./scripts/apply_pending_migrations.ps1
 
 # Correr pruebas
-psql "$DATABASE_URL" -f database/tests/test_price_resolution.sql
-psql "$DATABASE_URL" -f database/tests/test_crm_contactability.sql
+pwsh ./scripts/run_db_tests.ps1
 ```
 
 ## Paso 5 — Verificar RLS

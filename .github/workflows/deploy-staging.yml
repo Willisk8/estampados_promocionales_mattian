@@ -1,0 +1,44 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches:
+      - staging
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Apply migrations to Supabase STAGING
+    runs-on: ubuntu-latest
+    environment: staging
+
+    env:
+      DATABASE_URL: ${{ secrets.SUPABASE_STAGING_DATABASE_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required secret
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "Missing secret SUPABASE_STAGING_DATABASE_URL"
+            exit 1
+          fi
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Apply pending migrations
+        shell: pwsh
+        run: ./scripts/apply_pending_migrations.ps1
+
+      - name: Run database smoke tests
+        shell: pwsh
+        run: ./scripts/run_db_tests.ps1
