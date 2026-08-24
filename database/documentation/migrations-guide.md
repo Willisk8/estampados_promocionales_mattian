@@ -14,6 +14,9 @@ Aplicar en orden numérico estricto. Cada migración depende de las anteriores.
 | `005_supplier_product_mapping.sql` | Mapeo proveedor-variante (requiere aprobación humana) |
 | `006_prices_costs.sql` | Motor de precios: `costo_producto`, `precio_producto` |
 | `007_price_resolution.sql` | Función `resolve_price` (fuente única de verdad para precios) |
+| `008_crm_organizations_people.sql` | CRM base: organizaciones, personas, relaciones y canales |
+| `009_contactability_suppression.sql` | Contactabilidad, supresiones y elegibilidad de campaña |
+| `010_import_staging.sql` | Lotes de importación, filas raw y cola de revisión |
 
 ## Cómo aplicar en Supabase Staging
 
@@ -27,6 +30,9 @@ psql "$SUPABASE_DB_URL" -f database/migrations/004_supplier_catalog.sql
 psql "$SUPABASE_DB_URL" -f database/migrations/005_supplier_product_mapping.sql
 psql "$SUPABASE_DB_URL" -f database/migrations/006_prices_costs.sql
 psql "$SUPABASE_DB_URL" -f database/migrations/007_price_resolution.sql
+psql "$SUPABASE_DB_URL" -f database/migrations/008_crm_organizations_people.sql
+psql "$SUPABASE_DB_URL" -f database/migrations/009_contactability_suppression.sql
+psql "$SUPABASE_DB_URL" -f database/migrations/010_import_staging.sql
 ```
 
 > NUNCA incluir credenciales en archivos versionados.
@@ -74,10 +80,12 @@ psql "$SUPABASE_DB_URL" -f database/migrations/007_price_resolution.sql
 ## Cómo correr los tests
 
 Los tests están en `database/tests/test_price_resolution.sql`.
+También hay pruebas CRM/contactabilidad en `database/tests/test_crm_contactability.sql`.
 Se ejecutan dentro de una transacción que termina en `ROLLBACK` para no afectar datos.
 
 ```bash
 psql "$SUPABASE_DB_URL" -f database/tests/test_price_resolution.sql
+psql "$SUPABASE_DB_URL" -f database/tests/test_crm_contactability.sql
 ```
 
 El output esperado es una serie de `NOTICE` con `PASSED` para cada caso:

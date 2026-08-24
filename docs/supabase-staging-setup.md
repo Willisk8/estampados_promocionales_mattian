@@ -49,7 +49,12 @@ git status  # No debe aparecer .env.staging
    - `database/migrations/005_supplier_product_mapping.sql`
    - `database/migrations/006_prices_costs.sql`
    - `database/migrations/007_price_resolution.sql`
-3. Ejecutar `database/tests/test_price_resolution.sql` para verificar
+   - `database/migrations/008_crm_organizations_people.sql`
+   - `database/migrations/009_contactability_suppression.sql`
+   - `database/migrations/010_import_staging.sql`
+3. Ejecutar los tests para verificar:
+   - `database/tests/test_price_resolution.sql`
+   - `database/tests/test_crm_contactability.sql`
 
 ### Opción B: psql desde terminal
 ```bash
@@ -64,6 +69,7 @@ done
 
 # Correr pruebas
 psql "$DATABASE_URL" -f database/tests/test_price_resolution.sql
+psql "$DATABASE_URL" -f database/tests/test_crm_contactability.sql
 ```
 
 ## Paso 5 — Verificar RLS
@@ -74,6 +80,8 @@ En el SQL Editor verificar que ninguna tabla es accesible sin service_role:
 SELECT * FROM producto;        -- como anon
 SELECT * FROM proveedor;       -- como anon
 SELECT * FROM precio_producto; -- como anon
+SELECT * FROM organizacion;    -- como anon
+SELECT * FROM canal_contacto;  -- como anon
 ```
 
 ## Paso 6 — Generar secreto HMAC
