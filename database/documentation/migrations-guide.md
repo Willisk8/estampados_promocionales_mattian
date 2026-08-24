@@ -17,6 +17,8 @@ Aplicar en orden numérico estricto. Cada migración depende de las anteriores.
 | `008_crm_organizations_people.sql` | CRM base: organizaciones, personas, relaciones y canales |
 | `009_contactability_suppression.sql` | Contactabilidad, supresiones y elegibilidad de campaña |
 | `010_import_staging.sql` | Lotes de importación, filas raw y cola de revisión |
+| `011_security_hardening.sql` | Hardening de funciones: search_path fijo y revocación a anon/authenticated |
+| `012_revoke_public_execute.sql` | Revoca EXECUTE a PUBLIC en funciones SECURITY DEFINER |
 
 ## Cómo aplicar en Supabase Staging
 
@@ -29,7 +31,7 @@ pwsh ./scripts/apply_pending_migrations.ps1
 > Usar variables de entorno o Supabase Vault.
 
 El despliegue automático a STAGING vive en `.github/workflows/deploy-staging.yml`.
-Se activa con push a la rama `staging` y requiere el secret
+Se activa con push a la rama `staging` o manualmente desde GitHub Actions, y requiere el secret
 `SUPABASE_STAGING_DATABASE_URL`.
 
 ## Cómo agregar una nueva migración

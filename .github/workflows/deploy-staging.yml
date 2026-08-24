@@ -27,6 +27,13 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y postgresql-client
 
+      - name: Validate staging database secret
+        run: |
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "Missing GitHub Actions secret: SUPABASE_STAGING_DATABASE_URL"
+            exit 1
+          fi
+
       - name: Create schema_migrations tracking table
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
