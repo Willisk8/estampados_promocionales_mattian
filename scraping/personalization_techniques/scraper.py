@@ -44,6 +44,15 @@ CATALOG_FIELDS = [
 
 ERROR_FIELDS = ["source_id", "supplier", "source_url", "fetched_at", "error_type", "detail"]
 
+SNAPSHOT_IDENTITY_FIELDS = [
+    "source_id", "supplier", "city", "technique", "service_component",
+    "price_scope", "compatible_products", "compatible_materials",
+    "size_label", "width_cm", "height_cm", "quantity_min", "quantity_max",
+    "billing_unit", "currency", "price_value", "price_min", "price_max",
+    "tax_status", "conditions", "evidence_text", "source_url", "fetched_at",
+    "http_status", "verification_status"
+]
+
 
 TECHNIQUE_CATALOG = [
     ["sublimacion", "sublimado", "mugs; termos recubiertos; camisetas deportivas; telas; cojines; cintas", "poliéster claro; cerámica o metal con recubrimiento sublimable", "fotografías y full color; tacto cero en textil", "no funciona directamente sobre algodón oscuro ni objetos sin recubrimiento", "tamaño; cantidad; tipo de blanco; calandra o plancha"],
@@ -67,6 +76,18 @@ def now_iso() -> str:
 
 def clean(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
+
+
+def identity_value(value: Any) -> str:
+    return clean(value)
+
+
+def make_observation_id(row: dict[str, Any]) -> str:
+    payload = {field: identity_value(row.get(field)) for field in SNAPSHOT_IDENTITY_FIELDS}
+    payload["_identity_version"] = "snapshot-v2"
+    return hashlib.sha256(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:32]
 
 
 def fold(value: Any) -> str:
@@ -146,11 +167,8 @@ def add_row(rows: list[dict[str, Any]], source: dict[str, Any], fetched_at: str,
             price: float | None, ev: str, **kwargs: Any) -> None:
     if price is None and not kwargs.get("price_min") and not kwargs.get("price_max"):
         return
-    seed = "|".join([source["id"], technique, component, scope, clean(kwargs.get("size_label")),
-                     str(kwargs.get("quantity_min", "")), str(price or kwargs.get("price_min", ""))])
     row = {field: "" for field in PRICE_FIELDS}
     row.update({
-        "observation_id": hashlib.sha256(seed.encode("utf-8")).hexdigest()[:24],
         "source_id": source["id"], "supplier": source["supplier"], "city": source["city"],
         "technique": technique, "service_component": component, "price_scope": scope,
         "billing_unit": billing_unit, "currency": "COP", "price_value": price,
@@ -158,6 +176,7 @@ def add_row(rows: list[dict[str, Any]], source: dict[str, Any], fetched_at: str,
         "http_status": http_status, "verification_status": "VERIFIED_PUBLIC_PRICE"
     })
     row.update({k: v for k, v in kwargs.items() if k in row})
+    row["observation_id"] = make_observation_id(row)
     rows.append(row)
 
 
@@ -416,8 +435,32 @@ def run(config_path: Path, output_dir: Path, selected: set[str] | None = None) -
 
 
 def verify(output_dir: Path) -> dict[str, Any]:
-    prices = list(csv.DictReader((output_dir / "precios_tecnicas_personalizacion.csv").open(encoding="utf-8-sig")))
+    with (output_dir / "precios_tecnicas_personalizacion.csv").open(encoding="utf-8-sig") as handle:
+        prices = list(csv.DictReader(handle))
+    summary_path = output_dir / "resumen.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8")) if summary_path.exists() else {}
+    scraper_errors_path = output_dir / "errores.csv"
+    scraper_errors = []
+    if scraper_errors_path.exists():
+        with scraper_errors_path.open(encoding="utf-8-sig") as handle:
+            scraper_errors = list(csv.DictReader(handle))
     errors: list[str] = []
+    warnings: list[str] = []
+    if not prices:
+        errors.append("no_price_observations")
+    if not {r.get("source_id", "") for r in prices if r.get("source_id", "")}:
+        errors.append("no_sources_captured")
+    if summary:
+        if int(summary.get("fetched_sources") or 0) <= 0:
+            errors.append("summary_no_fetched_sources")
+        if int(summary.get("price_observations") or -1) != len(prices):
+            errors.append("summary_price_observations_mismatch")
+        if int(summary.get("configured_sources") or 0) <= 0:
+            errors.append("summary_no_configured_sources")
+    else:
+        errors.append("missing_resumen_json")
+    if scraper_errors:
+        warnings.append("scraper_errors_present")
     ids = [r["observation_id"] for r in prices]
     if len(ids) != len(set(ids)):
         errors.append("duplicate_observation_id")
@@ -431,7 +474,15 @@ def verify(output_dir: Path) -> dict[str, Any]:
             errors.append(f"row_{idx}_missing_evidence")
         if row["price_scope"] == "producto_personalizado" and row["service_component"] == "solo_marcacion":
             errors.append(f"row_{idx}_scope_component_conflict")
-    result = {"rows": len(prices), "techniques": len(set(r["technique"] for r in prices)), "errors": errors, "ok": not errors}
+    result = {
+        "rows": len(prices),
+        "sources": len({r.get("source_id", "") for r in prices if r.get("source_id", "")}),
+        "techniques": len(set(r["technique"] for r in prices)),
+        "scraper_errors": len(scraper_errors),
+        "warnings": warnings,
+        "errors": errors,
+        "ok": not errors,
+    }
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return result
 

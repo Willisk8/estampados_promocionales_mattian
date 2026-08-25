@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -27,6 +28,17 @@ from _shared import (  # noqa: E402
     stable_uuid,
     complete_batch,
 )
+
+SNAPSHOT_IDENTITY_FIELDS = [
+    "source_id", "supplier", "city", "technique", "service_component",
+    "price_scope", "compatible_products", "compatible_materials",
+    "size_label", "width_cm", "height_cm", "quantity_min", "quantity_max",
+    "billing_unit", "currency", "price_value", "price_min", "price_max",
+    "tax_status", "conditions", "evidence_text", "source_url", "fetched_at",
+    "http_status", "verification_status"
+]
+
+REQUIRED_PRICE_FIELDS = ["source_id", "supplier", "technique"]
 
 
 def read_csv(path: Path) -> list[dict]:
@@ -49,6 +61,39 @@ def parse_int(value) -> int | None:
     if value is None:
         return None
     return int(float(value))
+
+
+def snapshot_observation_id(row: dict) -> str:
+    payload = {field: clean_value(row.get(field)) or "" for field in SNAPSHOT_IDENTITY_FIELDS}
+    payload = {field: str(value) for field, value in payload.items()}
+    payload["_identity_version"] = "snapshot-v2"
+    return hashlib.sha256(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:32]
+
+
+def has_any_price(row: dict) -> bool:
+    return any(clean_value(row.get(field)) is not None for field in ("price_value", "price_min", "price_max"))
+
+
+def validate_price_records(price_records: list[dict]) -> None:
+    invalid: list[str] = []
+    for row in price_records:
+        missing = [field for field in REQUIRED_PRICE_FIELDS if clean_value(row.get(field)) is None]
+        if not has_any_price(row):
+            missing.append("price_value|price_min|price_max")
+        if missing:
+            invalid.append(
+                f"fila {row.get('__sheet_row_number', '?')}: faltan {', '.join(missing)}"
+            )
+    if invalid:
+        preview = "; ".join(invalid[:10])
+        extra = "" if len(invalid) <= 10 else f"; ... {len(invalid) - 10} mas"
+        raise RuntimeError(
+            "precios_tecnicas_personalizacion.csv contiene filas invalidas. "
+            "La carga se aborta para no perder trazabilidad: "
+            f"{preview}{extra}"
+        )
 
 
 def aliases_to_array(value) -> list[str] | None:
@@ -129,9 +174,9 @@ def normalize_prices(price_records: list[dict]) -> list[dict]:
         source_id = clean_value(row.get("source_id"))
         supplier = clean_value(row.get("supplier"))
         technique = clean_value(row.get("technique"))
-        observation_id = clean_value(row.get("observation_id"))
-        if not (source_id and supplier and technique and observation_id):
+        if not (source_id and supplier and technique):
             continue
+        observation_id = snapshot_observation_id(row)
         formato_costeo = {
             "size_label": clean_value(row.get("size_label")),
             "billing_unit": clean_value(row.get("billing_unit")),
@@ -140,6 +185,7 @@ def normalize_prices(price_records: list[dict]) -> list[dict]:
         }
         normalized.append({
             **row,
+            "observation_id": observation_id,
             "id_snapshot": stable_uuid("precio_tecnica_marcacion_snapshot", observation_id),
             "id_tecnica": technique_id(technique),
             "id_proveedor_tecnica": supplier_id(source_id, supplier),
@@ -261,16 +307,20 @@ def run(input_dir: str, dry_run: bool):
 
     techniques_raw = read_csv(techniques_path)
     prices_raw = read_csv(prices_path)
+    validate_price_records(prices_raw)
     techniques = normalize_techniques(techniques_raw, prices_raw)
+    raw_techniques = normalize_techniques(techniques_raw, [])
     suppliers = normalize_suppliers(prices_raw)
     prices = normalize_prices(prices_raw)
 
-    total_rows = len(techniques) + len(suppliers) + len(prices)
+    source_rows = len(techniques_raw) + len(prices_raw)
+    target_rows = len(techniques) + len(suppliers) + len(prices)
     print(f"Directorio: {input_path}")
+    print(f"  filas fuente CSV:                  {source_rows:>5,}")
     print(f"  tecnica_marcacion:                 {len(techniques):>5,}")
     print(f"  proveedor_tecnica_marcacion:       {len(suppliers):>5,}")
     print(f"  precio_tecnica_marcacion_snapshot: {len(prices):>5,}")
-    print(f"  Total filas:                       {total_rows:>5,}")
+    print(f"  Total filas destino:               {target_rows:>5,}")
 
     if dry_run:
         print("\n[DRY RUN] No se escribió nada en la base de datos.")
@@ -283,7 +333,7 @@ def run(input_dir: str, dry_run: bool):
 
     db_url = load_env()
     with psycopg.connect(db_url, prepare_threshold=None) as conn:
-        batch_id = register_batch(conn, source_name, str(input_path), combined_sha, total_rows)
+        batch_id = register_batch(conn, source_name, str(input_path), combined_sha, source_rows)
         if batch_id is None:
             print("Estos CSV ya fueron importados (mismo checksum).")
             return
@@ -294,15 +344,10 @@ def run(input_dir: str, dry_run: bool):
                 print("\nRegistrando trazabilidad import_raw_row...")
                 row_cursor = 1
                 n = register_raw_rows(
-                    cur, batch_id, "catalogo_tecnicas", techniques, row_cursor,
+                    cur, batch_id, "catalogo_tecnicas", raw_techniques, row_cursor,
                     "tecnica_marcacion", "id_tecnica", "OTHER",
                 )
-                row_cursor += len(techniques)
-                n += register_raw_rows(
-                    cur, batch_id, "proveedor_tecnica_marcacion", suppliers, row_cursor,
-                    "proveedor_tecnica_marcacion", "id_proveedor_tecnica", "OTHER",
-                )
-                row_cursor += len(suppliers)
+                row_cursor += len(raw_techniques)
                 n += register_raw_rows(
                     cur, batch_id, "precios_tecnicas_personalizacion", prices, row_cursor,
                     "precio_tecnica_marcacion_snapshot", "id_snapshot", "OTHER",
