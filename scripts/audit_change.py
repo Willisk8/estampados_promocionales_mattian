@@ -51,6 +51,9 @@ TABLAS_APPEND_ONLY = (
     "precio_tecnica_marcacion_snapshot",
 )
 
+# Directorios que no son codigo del proyecto y no deben auditarse.
+IGNORADOS = {"node_modules", ".next", "__pycache__", ".git", "dist", "build"}
+
 SEVERIDAD_ERROR = "ERROR"
 SEVERIDAD_WARN = "WARN"
 
@@ -391,6 +394,12 @@ def main() -> int:
             rel_parts = path.relative_to(ROOT).parts
         except ValueError:
             continue  # fuera del repositorio: no es asunto de esta auditoria
+
+        # Dependencias y artefactos de build no son codigo del proyecto. El SDK
+        # de Supabase menciona la clave privilegiada en sus propios tipos, que
+        # es legitimo y no dice nada sobre lo que hace esta consola.
+        if any(p in IGNORADOS for p in rel_parts):
+            continue
 
         if rel_parts[:2] == ("database", "migrations") and path.suffix == ".sql":
             auditar_migracion(path, rep)
