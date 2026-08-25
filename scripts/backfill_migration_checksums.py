@@ -31,6 +31,9 @@ ROOT = Path(__file__).resolve().parent.parent
 MIGRATIONS = ROOT / "database" / "migrations"
 MANIFIESTO = MIGRATIONS / "CHECKSUMS.txt"
 
+CRLF = chr(13) + chr(10)
+LF = chr(10)
+
 
 def cargar_entorno() -> str:
     env_file = ROOT / ".env.staging"
@@ -44,7 +47,13 @@ def cargar_entorno() -> str:
 
 
 def sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    """SHA-256 estable entre plataformas: normaliza CRLF -> LF y descarta BOM.
+
+    Git entrega CRLF en Windows y LF en el runner de CI; hashear los bytes
+    crudos daria dos checksums distintos para el mismo archivo.
+    """
+    texto = path.read_bytes().decode("utf-8-sig", errors="replace")
+    return hashlib.sha256(texto.replace(CRLF, LF).encode("utf-8")).hexdigest()
 
 
 def main() -> int:
@@ -53,6 +62,12 @@ def main() -> int:
         "--apply",
         action="store_true",
         help="escribir en la base de datos; sin esta bandera solo muestra el plan",
+    )
+    parser.add_argument(
+        "--recompute",
+        action="store_true",
+        help="recalcular TODOS los checksums, no solo los ausentes "
+             "(necesario si cambia el algoritmo de hash)",
     )
     args = parser.parse_args()
 
@@ -104,7 +119,10 @@ def main() -> int:
             )
             registradas = {f: (c, b) for f, c, b in cur.fetchall()}
 
-            pendientes = [f for f in registradas if registradas[f][0] is None and f in locales]
+            if args.recompute:
+                pendientes = [f for f in registradas if f in locales]
+            else:
+                pendientes = [f for f in registradas if registradas[f][0] is None and f in locales]
             sin_archivo = [f for f in registradas if f not in locales]
             sin_aplicar = [f for f in locales if f not in registradas]
 
@@ -128,9 +146,10 @@ def main() -> int:
                     """
                     UPDATE public.schema_migrations
                     SET checksum_sha256 = %s, checksum_backfilled = true
-                    WHERE filename = %s AND checksum_sha256 IS NULL
+                    WHERE filename = %s
+                      AND (checksum_sha256 IS NULL OR %s)
                     """,
-                    (locales[f], f),
+                    (locales[f], f, args.recompute),
                 )
             conn.commit()
             print(f"\nRegistrados {len(pendientes)} checksums reconstruidos.")

@@ -1,0 +1,7 @@
+# Los checksums de migracion se calculan sobre el contenido normalizado,
+# pero mantener LF evita que el arbol de trabajo cambie entre Windows y CI.
+*.sql text eol=lf
+*.py  text eol=lf
+*.md  text eol=lf
+*.yml text eol=lf
+*.ps1 text eol=crlf

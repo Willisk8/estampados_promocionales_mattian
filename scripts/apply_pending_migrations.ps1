@@ -23,6 +23,35 @@ function Invoke-PsqlChecked {
     }
 }
 
+function Get-NormalizedSha256 {
+    <#
+        SHA-256 sobre el contenido normalizado, no sobre los bytes crudos.
+        Git entrega CRLF en Windows y LF en el runner de CI; hashear los bytes
+        crudos daria dos checksums distintos para el mismo archivo y el runner
+        abortaria en una de las dos plataformas.
+        Debe coincidir con scripts/audit_change.py y con
+        scripts/backfill_migration_checksums.py.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+        $bytes = $bytes[3..($bytes.Length - 1)]
+    }
+    $text = [System.Text.Encoding]::UTF8.GetString($bytes).Replace("`r`n", "`n")
+
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $hash = $sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($text))
+    } finally {
+        $sha.Dispose()
+    }
+    return ([System.BitConverter]::ToString($hash) -replace '-', '').ToLower()
+}
+
 function ConvertTo-PsqlLiteral {
     param(
         [Parameter(Mandatory = $true)]
@@ -80,7 +109,7 @@ $migrations = Get-ChildItem -LiteralPath $MigrationsDir -Filter "*.sql" |
 foreach ($migration in $migrations) {
     $filename = $migration.Name
     $filenameLiteral = ConvertTo-PsqlLiteral $filename
-    $checksum = (Get-FileHash -Algorithm SHA256 -LiteralPath $migration.FullName).Hash.ToLower()
+    $checksum = Get-NormalizedSha256 -Path $migration.FullName
     $checksumLiteral = ConvertTo-PsqlLiteral $checksum
 
     $registered = & psql $DatabaseUrl -At -F "|" -v ON_ERROR_STOP=1 -c `

@@ -82,6 +82,17 @@ class Reporte:
         return [h for h in self.hallazgos if h.severidad == SEVERIDAD_WARN]
 
 
+def checksum_normalizado(path: Path) -> str:
+    """SHA-256 estable entre plataformas.
+
+    Git entrega CRLF en Windows y LF en el runner de CI. Hashear los bytes
+    crudos hace que el mismo archivo tenga dos checksums distintos, asi que se
+    normalizan los finales de linea y se descarta el BOM antes de hashear.
+    """
+    texto = path.read_bytes().decode("utf-8-sig", errors="replace")
+    return hashlib.sha256(texto.replace("\r\n", "\n").encode("utf-8")).hexdigest()
+
+
 def sin_comentarios(sql: str) -> str:
     """Quita comentarios de linea y de bloque para no disparar falsos positivos."""
     sql = re.sub(r"/\*.*?\*/", " ", sql, flags=re.DOTALL)
@@ -126,7 +137,7 @@ def auditar_migracion(path: Path, rep: Reporte) -> None:
             if "  " in linea:
                 digest, archivo = linea.split("  ", 1)
                 registrados[archivo.strip()] = digest.strip()
-        actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        actual = checksum_normalizado(path)
         esperado = registrados.get(nombre)
         if esperado and esperado != actual:
             rep.error(
