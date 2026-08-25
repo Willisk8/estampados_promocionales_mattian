@@ -64,7 +64,7 @@ Los 58 HIGH corresponden a dominios malformados puestos en cuarentena por la mig
 
 ## Gate 4 - Backup de secretos y retencion de PII
 
-Estado: pendiente documental/operativo.
+Estado: parcialmente implementado.
 
 El `HMAC_SUPPRESSION_SECRET` debe respaldarse fuera del entorno local, fuera de Git y fuera de Supabase. Si se pierde, no se pueden recalcular hashes compatibles para comparar contra supresiones previas.
 
@@ -77,13 +77,28 @@ Politica propuesta para `import_raw_row`:
 | `import_raw_row.normalized_payload` | Retener maximo 90 dias si contiene PII |
 | `target_table` / `target_id` | Retener para trazabilidad minima |
 
-Antes de PROD se debe crear una migracion o job de purga controlada que anonimice o elimine payloads crudos vencidos sin perder metadata de linaje.
+La migracion `022_import_raw_row_retention.sql` crea
+`fn_anonymize_import_raw_rows(p_retention_days, p_dry_run)` para anonimizar
+`raw_payload` y `normalized_payload` sin perder metadata de linaje. Por defecto
+corre en dry-run. Queda pendiente ejecutar la politica de forma programada y
+respaldar el `HMAC_SUPPRESSION_SECRET` fuera del entorno local.
 
 ## Gate 5 - Catalogo propio
 
-Estado: pendiente.
+Estado: en ejecucion.
 
-El catalogo proveedor esta cargado como referencia de mercado, pero no reemplaza el catalogo propio. Antes de cotizar con datos reales faltan productos propios, variantes, costos, margenes, impuestos y escalas comerciales.
+El catalogo proveedor esta cargado como referencia de mercado, pero no reemplaza
+el catalogo propio. El seed MVP ya contempla 5 productos con vigencia desde
+`2026-08-01T00:00:00+00:00`:
+
+- `PRD-MUG-11OZ`
+- `PRD-CAMI-BASICA`
+- `PRD-TERMO-BASICO`
+- `PRD-TULA-ECO`
+- `PRD-ESFERO-ECO`
+
+Falta aplicar el seed a STAGING, activar controladamente los productos de prueba
+y validar `resolve_price()` antes de considerar cerrado el gate tecnico.
 
 ## Decision
 

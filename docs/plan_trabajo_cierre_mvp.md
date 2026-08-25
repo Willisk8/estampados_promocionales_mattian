@@ -12,11 +12,11 @@ base de datos segura para seguir curando contactos.
 
 | Frente | Estado | Nota |
 |---|---|---|
-| Supabase STAGING | Cerrado para Fase 1 | Migraciones `000`-`021` aplicadas. |
+| Supabase STAGING | Cerrado para Fase 1 | Migraciones `000`-`021` aplicadas; `022` agrega retencion PII. |
 | CRM solidario | Cargado | 5,639 organizaciones y 16,211 canales. |
 | Catálogo proveedor | Cargado | 7 proveedores, 935 productos, 934 snapshots. |
 | Técnicas de marcación | Cargado inicial | 14 técnicas, 12 proveedores/fuentes, 65 snapshots. |
-| Catálogo propio vendible | En construcción | Falta seed aplicado y activación controlada. |
+| Catálogo propio vendible | En construcción | Seed MVP de 5 productos generado; falta aplicación/activación controlada. |
 | Propiedad horizontal | Pipeline listo, no cargado | Falta importador y deduplicación contra CRM. |
 | Campañas | Bloqueado | Depende de contactabilidad, validación de buzones y revisión legal. |
 
@@ -35,7 +35,7 @@ Tareas:
   en GitHub.
 - Sincronizar `master` y `staging` cuando se apruebe publicar el cambio.
 - Verificar que GitHub Actions ejecute CI y deploy de STAGING sin fallos.
-- Confirmar en Supabase que `schema_migrations` contiene `021_marking_technique_costs.sql`.
+- Confirmar en Supabase que `schema_migrations` contiene `021_marking_technique_costs.sql` y `022_import_raw_row_retention.sql`.
 
 Entregable:
 
@@ -143,9 +143,9 @@ Productos candidatos:
 | Mug 11 oz | Sublimación | Incluir. |
 | Camiseta DTF pecho | DTF textil | Incluir. |
 | Camiseta DTF pecho + espalda | DTF textil | Incluir. |
-| Tula ecológica | DTF textil 15 x 20 cm | Incluir después de confirmar costo de tula. |
+| Tula ecológica | DTF textil 15 x 20 cm | Incluida con costos placeholder por confirmar. |
 | Termo | DTF UV | Incluir con revisión de área y proveedor. |
-| Esfero | Tampografía/UV | Mantener pendiente si no hay unidad/setup confiable. |
+| Esfero | Tampografía/UV | Incluido con marcación fija provisional; unidad/setup siguen por confirmar. |
 | Kit temporada | Composición variable | No incluir todavía. |
 
 Tareas:
@@ -325,7 +325,7 @@ Tablas futuras:
 
 ## Orden recomendado de ejecución
 
-1. Publicar y sincronizar el trabajo de `021` en GitHub/STAGING.
+1. Publicar y sincronizar el trabajo de `021`-`022` en GitHub/STAGING.
 2. Curar costos de técnicas para uso automático.
 3. Ajustar calculadora con costos versionados.
 4. Cerrar 5 productos MVP propios.

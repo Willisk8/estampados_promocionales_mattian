@@ -110,6 +110,9 @@ python scripts/catalog/generate_catalog_seed.py scripts/catalog/mvp_catalog_inpu
 
 El SQL deja `producto` y `variante_producto` en `DRAFT`. Esto es intencional: `resolve_price()` solo cotiza productos `ACTIVE`.
 
+El seed actual usa `valid_from = 2026-08-01T00:00:00+00:00` para que el smoke
+test de STAGING sea vigente durante agosto de 2026.
+
 Limitacion actual: `costo_producto` no tiene rango por cantidad. Por eso el generador guarda un costo de referencia (`cost_reference_quantity`) y los precios comerciales por escala quedan en `precio_producto.quantity_range`.
 
 Regla comercial actual: los precios de proveedor pueden cambiar mensual, diario o por negociacion. En STAGING/produccion se deben guardar como snapshots append-only en `precio_proveedor_snapshot` y luego regenerar costos/precios propios con nueva `vigencia`. No se debe actualizar historico en sitio.
@@ -123,13 +126,17 @@ Ejemplos actuales de insumo usados por el MVP:
 
 ## Proximo paso operativo
 
-No cargar 935 productos al catalogo propio. Para cerrar el MVP comercial, seleccionar 3-5 productos reales:
+No cargar 935 productos al catalogo propio. Para cerrar el MVP comercial, el seed
+MVP actual selecciona 5 productos:
 
 1. Mug sublimable 11 oz
 2. Termo personalizado
 3. Camiseta personalizada
 4. Tula/bolsa ecologica
-5. Kit promocional temporada
+5. Esfero ecologico personalizado
+
+El kit promocional de temporada queda fuera por ahora porque su composicion es
+variable y debe modelarse como ensamble de componentes cuando se defina.
 
 Para cada producto se debe definir:
 

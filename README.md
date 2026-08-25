@@ -9,7 +9,7 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 | Componente | Estado | Detalle |
 |---|---|---|
 | Infraestructura Supabase STAGING | ✓ Completo | Proyecto `psereyjwjpyakkmnabgm`, región us-west-2 Oregon |
-| Migraciones `000`–`021` | ✓ Aplicadas en STAGING | 22 migraciones numeradas; deploy idempotente vía `schema_migrations` |
+| Migraciones `000`–`022` | ✓ Aplicadas/pendientes de deploy | 23 migraciones numeradas; deploy idempotente vía `schema_migrations` |
 | Motor de precios (`resolve_price`) | ✓ Operativo | Tests A–F pasando |
 | CRM — organizaciones y personas | ✓ Cargado | 5,639 organizaciones · 4,642 personas |
 | CRM — canales de contacto | ✓ Cargado | 16,211 canales (email, teléfono, WhatsApp, web) |
@@ -153,6 +153,7 @@ No usar scripts no idempotentes para migraciones. El único flujo manual soporta
 | `019_channel_scoped_campaign_eligibility.sql` | Corrige elegibilidad por canal cuando `018` ya fue aplicada en STAGING |
 | `020_require_email_hash_for_campaign_eligibility.sql` | Exige HMAC para elegibilidad y evita omitir supresión global |
 | `021_marking_technique_costs.sql` | Tablas append-only para costos de técnicas de marcación |
+| `022_import_raw_row_retention.sql` | Función de anonimización de payloads PII vencidos en `import_raw_row` |
 
 ### Convenciones obligatorias
 
@@ -349,6 +350,14 @@ python scripts/catalog/generate_catalog_seed.py scripts/catalog/mvp_catalog_inpu
 
 Los productos generados quedan en `DRAFT`; no serán cotizables por `resolve_price()` hasta que se activen explícitamente.
 
+El seed MVP actual contiene 5 productos y vigencia desde `2026-08-01T00:00:00+00:00`:
+
+- `PRD-MUG-11OZ`
+- `PRD-CAMI-BASICA`
+- `PRD-TERMO-BASICO`
+- `PRD-TULA-ECO`
+- `PRD-ESFERO-ECO`
+
 Documento: [`docs/catalogo_propio_mvp.md`](docs/catalogo_propio_mvp.md)
 
 ### Costos de técnicas de marcación
@@ -434,7 +443,7 @@ Plan maestro: [`docs/plan_trabajo_cierre_mvp.md`](docs/plan_trabajo_cierre_mvp.m
 
 | Prioridad | Tarea |
 |---|---|
-| Alta | Publicar/sincronizar `021_marking_technique_costs.sql` en GitHub y rama `staging` |
+| Alta | Publicar/sincronizar migraciones `021`–`022`, catálogo MVP y plan de cierre en GitHub/rama `staging` |
 | Alta | Curar costos de técnicas de marcación para definir cuáles alimentan cálculo automático |
 | Alta | Ajustar la calculadora para usar costos versionados de proveedor y marcación |
 | Alta | Cerrar 5 productos propios MVP y probar `resolve_price()` de punta a punta |
