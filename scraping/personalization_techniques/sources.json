@@ -1,0 +1,112 @@
+{
+  "user_agent": "EstampadosTechniqueResearch/1.0 (+precios publicos Colombia)",
+  "request_delay_seconds": 0.5,
+  "timeout_seconds": 35,
+  "sources": [
+    {
+      "id": "ink_bordados_dtf",
+      "supplier": "Ink Bordados y Estampados",
+      "city": "Colombia",
+      "url": "https://inkbordadosyestampados.com/products/sublitransfer",
+      "parser": "ink_dtf"
+    },
+    {
+      "id": "mugnifico_sublimacion",
+      "supplier": "Mugnifico",
+      "city": "Bogotá",
+      "url": "https://www.mugnifico.co/mugs",
+      "parser": "mugnifico"
+    },
+    {
+      "id": "expresa_tus_ideas",
+      "supplier": "Expresa Tus Ideas",
+      "city": "Bogotá",
+      "url": "https://expresatusideas.com/",
+      "parser": "expresa"
+    },
+    {
+      "id": "arte_creaciones_sublimacion",
+      "supplier": "Arte y Creaciones",
+      "city": "Bogotá",
+      "url": "https://arteycreaciones.com.co/servicios/impresion-sublimacion",
+      "parser": "arte_sublimacion"
+    },
+    {
+      "id": "arte_creaciones_dtf",
+      "supplier": "Arte y Creaciones",
+      "city": "Bogotá",
+      "url": "https://arteycreaciones.com.co/camisetas-estampadas-dtf-bogota",
+      "parser": "arte_dtf"
+    },
+    {
+      "id": "maitex_dtf",
+      "supplier": "Maitex DTF",
+      "city": "Colombia",
+      "url": "https://maitex.com.co/collections/impresiones-en-dtf",
+      "parser": "maitex"
+    },
+    {
+      "id": "imprinco_vinilo",
+      "supplier": "Imprinco",
+      "city": "Bogotá",
+      "url": "https://imprinco.com/producto/servicio-de-estampado-vinilo-textil/",
+      "parser": "imprinco_vinilo"
+    },
+    {
+      "id": "publicitar_dtf_uv",
+      "supplier": "Publicitar",
+      "city": "Bogotá",
+      "url": "https://publicitar.com.co/tienda/servicios/servicio-de-dtf-uv-7-x-10-cm-personalizado/",
+      "parser": "publicitar_dtf_uv"
+    },
+    {
+      "id": "disenco_servicios",
+      "supplier": "DISENCO Plataforma Gráfica",
+      "city": "Bogotá",
+      "url": "https://disencopg.com.co/",
+      "parser": "disenco"
+    },
+    {
+      "id": "innova_laser",
+      "supplier": "Innova Marquillas",
+      "city": "Bogotá",
+      "url": "https://www.innovamarquillas.com/",
+      "parser": "innova_laser"
+    },
+    {
+      "id": "smartpoint_uv",
+      "supplier": "Smart Point Ricaurte",
+      "city": "Bogotá",
+      "url": "https://www.smartpointprint.com/pag/calculadora_impresion_rigidos.html",
+      "parser": "smartpoint_uv"
+    },
+    {
+      "id": "dayarve_bordado",
+      "supplier": "Dayarve",
+      "city": "Colombia",
+      "url": "https://www.dayarve.com/polos-bordados/",
+      "parser": "dayarve"
+    },
+    {
+      "id": "lucky_dtf",
+      "supplier": "Lucky Store",
+      "city": "Barranquilla",
+      "url": "https://camiseta.getlucky.company/",
+      "parser": "lucky"
+    },
+    {
+      "id": "printeam_agendas",
+      "supplier": "Print Team Publicidad",
+      "city": "Bogotá",
+      "url": "https://www.printeampublicidad.com.co/agendas-personalizadas-bogota/",
+      "parser": "printeam"
+    },
+    {
+      "id": "sm_impresion_tecnicas",
+      "supplier": "SM Impresión y Publicidad",
+      "city": "Bogotá",
+      "url": "https://smimpresionypublic.wixsite.com/sm-impresi-n-y-publi",
+      "parser": "sm_techniques"
+    }
+  ]
+}

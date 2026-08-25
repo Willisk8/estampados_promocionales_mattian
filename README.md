@@ -9,7 +9,7 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 | Componente | Estado | Detalle |
 |---|---|---|
 | Infraestructura Supabase STAGING | ✓ Completo | Proyecto `psereyjwjpyakkmnabgm`, región us-west-2 Oregon |
-| Migraciones `000`–`020` | ✓ Aplicadas/pendientes CI | 21 migraciones numeradas; deploy idempotente vía `schema_migrations` |
+| Migraciones `000`–`021` | ✓ Aplicadas en STAGING | 22 migraciones numeradas; deploy idempotente vía `schema_migrations` |
 | Motor de precios (`resolve_price`) | ✓ Operativo | Tests A–F pasando |
 | CRM — organizaciones y personas | ✓ Cargado | 5,639 organizaciones · 4,642 personas |
 | CRM — canales de contacto | ✓ Cargado | 16,211 canales (email, teléfono, WhatsApp, web) |
@@ -150,6 +150,7 @@ No usar scripts no idempotentes para migraciones. El único flujo manual soporta
 | `018_audit_hardening.sql` | Bloquea variantes inactivas y deduplica historial en elegibilidad CRM |
 | `019_channel_scoped_campaign_eligibility.sql` | Corrige elegibilidad por canal cuando `018` ya fue aplicada en STAGING |
 | `020_require_email_hash_for_campaign_eligibility.sql` | Exige HMAC para elegibilidad y evita omitir supresión global |
+| `021_marking_technique_costs.sql` | Tablas append-only para costos de técnicas de marcación |
 
 ### Convenciones obligatorias
 
@@ -347,6 +348,21 @@ python scripts/catalog/generate_catalog_seed.py scripts/catalog/mvp_catalog_inpu
 Los productos generados quedan en `DRAFT`; no serán cotizables por `resolve_price()` hasta que se activen explícitamente.
 
 Documento: [`docs/catalogo_propio_mvp.md`](docs/catalogo_propio_mvp.md)
+
+### Costos de técnicas de marcación
+
+La investigación de mercado de técnicas vive en
+`scraping/personalization_techniques/outputs/` y se importa con:
+
+```powershell
+python scripts/import/import_tecnicas_marcacion.py --dir scraping/personalization_techniques/outputs/<run_id>
+```
+
+El objetivo es alimentar la calculadora con costos actualizables de DTF, DTFV,
+sublimación, tampografía, serigrafía, láser y bordado. Ver
+[`docs/tecnicas_marcacion_costos.md`](docs/tecnicas_marcacion_costos.md).
+
+Carga inicial STAGING: 14 técnicas · 12 proveedores/fuentes · 65 snapshots.
 
 ---
 
