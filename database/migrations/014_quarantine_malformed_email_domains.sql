@@ -5,6 +5,13 @@
 -- Los canales NO se eliminan ni se corrigen automaticamente.
 -- Se marcan REVIEW_REQUIRED y se abre un item de revision enlazado
 -- a import_raw_row para conservar trazabilidad al archivo/fila origen.
+--
+-- ONE-TIME BACKFILL:
+-- Esta migracion asume que ya se importo la base completa
+-- base_consolidada_contactos.csv que produjo 58 canales con estos dominios
+-- malformados. En una base vacia o con otra fuente, el guardia de conteo debe
+-- revisarse antes de aplicar porque protege contra datos inesperados, no contra
+-- todos los posibles estados de entorno.
 -- ============================================================
 
 DO $$

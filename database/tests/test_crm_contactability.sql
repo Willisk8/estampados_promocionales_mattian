@@ -86,7 +86,7 @@ INSERT INTO contactabilidad (
 ) VALUES (
     '00000000-0000-4000-b000-000000000006',
     '00000000-0000-4000-b000-000000000004',
-    'CONSENTIMIENTO',
+    'CONSENTIMIENTO_EXPRESO',
     'Fixture historico cerrado',
     now() - interval '2 days',
     now() - interval '1 day'
@@ -109,7 +109,7 @@ DO $$
 DECLARE
     r RECORD;
 BEGIN
-    SELECT * INTO r FROM fn_email_eligible_for_campaign('hash-fixture-contacto-testcrm');
+    SELECT * INTO r FROM fn_email_eligible_for_campaign('00000000-0000-4000-b000-000000000004'::uuid);
     ASSERT r.eligible = false, 'unknown contactability should not be eligible';
     ASSERT r.reason = 'CONTACTABILITY_NOT_CONFIRMED',
         'expected CONTACTABILITY_NOT_CONFIRMED, got ' || COALESCE(r.reason, 'NULL');
@@ -135,7 +135,7 @@ DECLARE
     r RECORD;
     v_base TEXT;
 BEGIN
-    SELECT * INTO r FROM fn_email_eligible_for_campaign('hash-fixture-contacto-testcrm');
+    SELECT * INTO r FROM fn_email_eligible_for_campaign('00000000-0000-4000-b000-000000000004'::uuid);
     ASSERT r.eligible = false, 'future consent should not be eligible';
     ASSERT r.reason = 'CONTACTABILITY_NOT_CONFIRMED',
         'expected CONTACTABILITY_NOT_CONFIRMED for future consent, got ' || COALESCE(r.reason, 'NULL');
@@ -167,7 +167,7 @@ DO $$
 DECLARE
     r RECORD;
 BEGIN
-    SELECT * INTO r FROM fn_email_eligible_for_campaign('hash-fixture-contacto-testcrm');
+    SELECT * INTO r FROM fn_email_eligible_for_campaign('00000000-0000-4000-b000-000000000004'::uuid);
     ASSERT r.eligible = true, 'effective consent should be eligible before NO_CONTACTAR';
     ASSERT r.reason = 'ELIGIBLE',
         'expected ELIGIBLE before NO_CONTACTAR, got ' || COALESCE(r.reason, 'NULL');
@@ -192,7 +192,7 @@ DECLARE
     r RECORD;
     v_base TEXT;
 BEGIN
-    SELECT * INTO r FROM fn_email_eligible_for_campaign('hash-fixture-contacto-testcrm');
+    SELECT * INTO r FROM fn_email_eligible_for_campaign('00000000-0000-4000-b000-000000000004'::uuid);
     ASSERT r.eligible = false, 'NO_CONTACTAR should win over older open consent';
     ASSERT r.reason = 'CONTACTABILITY_NOT_CONFIRMED',
         'expected CONTACTABILITY_NOT_CONFIRMED after NO_CONTACTAR, got ' || COALESCE(r.reason, 'NULL');
@@ -203,6 +203,72 @@ BEGIN
     ASSERT v_base = 'NO_CONTACTAR',
         'view should show latest effective NO_CONTACTAR, got ' || COALESCE(v_base, 'NULL');
     RAISE NOTICE 'PASSED - NO_CONTACTAR wins over older open consent';
+END;
+$$;
+
+-- Dos canales pueden compartir email_hash. La elegibilidad debe aislarse por
+-- id_canal_contacto; el consentimiento de un canal no habilita otro canal con
+-- NO_CONTACTAR o DESCONOCIDA. La supresion sí sigue siendo global por hash.
+INSERT INTO organizacion (
+    id_organizacion, nit, nombre_legal, sigla, tipo_entidad_origen
+) VALUES (
+    '00000000-0000-4000-b000-000000000010',
+    '999000002',
+    'ORGANIZACION SINTETICA DUPLICADO EMAIL',
+    'TESTCRM2',
+    'Fixture sintetico'
+);
+
+INSERT INTO canal_contacto (
+    id_canal_contacto, id_organizacion, tipo, valor_original,
+    valor_normalizado, email_hash, fuente, confianza
+) VALUES (
+    '00000000-0000-4000-b000-000000000011',
+    '00000000-0000-4000-b000-000000000010',
+    'EMAIL',
+    'Contacto@Testcrm.example',
+    'contacto@testcrm.example',
+    'hash-fixture-contacto-testcrm',
+    'fixture',
+    'HIGH'
+);
+
+INSERT INTO contactabilidad (
+    id_contactabilidad, id_canal_contacto, base_contacto_codigo,
+    evidencia, valido_desde, valido_hasta
+) VALUES (
+    '00000000-0000-4000-b000-000000000012',
+    '00000000-0000-4000-b000-000000000011',
+    'CONSENTIMIENTO_EXPRESO',
+    'Fixture consentimiento en otro canal con mismo hash',
+    now(),
+    NULL
+);
+
+DO $$
+DECLARE
+    r_no_contactar RECORD;
+    r_consentido RECORD;
+    v_eligible_count INTEGER;
+BEGIN
+    SELECT * INTO r_no_contactar
+    FROM fn_email_eligible_for_campaign('00000000-0000-4000-b000-000000000004'::uuid);
+    SELECT * INTO r_consentido
+    FROM fn_email_eligible_for_campaign('00000000-0000-4000-b000-000000000011'::uuid);
+
+    ASSERT r_no_contactar.eligible = false,
+        'NO_CONTACTAR channel must not inherit consent from duplicated hash';
+    ASSERT r_consentido.eligible = true,
+        'consented duplicated channel should be eligible before global suppression';
+
+    SELECT COUNT(*) INTO v_eligible_count
+    FROM vw_campaign_eligibility_queue
+    WHERE email_hash = 'hash-fixture-contacto-testcrm'
+      AND eligible = true;
+    ASSERT v_eligible_count = 1,
+        'duplicated hash should have exactly one eligible channel, got ' || v_eligible_count;
+
+    RAISE NOTICE 'PASSED - eligibility is scoped by channel, not duplicated email_hash';
 END;
 $$;
 
@@ -219,7 +285,7 @@ DO $$
 DECLARE
     r RECORD;
 BEGIN
-    SELECT * INTO r FROM fn_email_eligible_for_campaign('hash-fixture-contacto-testcrm');
+    SELECT * INTO r FROM fn_email_eligible_for_campaign('00000000-0000-4000-b000-000000000011'::uuid);
     ASSERT r.eligible = false, 'suppressed email should not be eligible';
     ASSERT r.reason = 'SUPPRESSED',
         'expected SUPPRESSED, got ' || COALESCE(r.reason, 'NULL');
