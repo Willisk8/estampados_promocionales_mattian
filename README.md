@@ -17,6 +17,7 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 | Vistas operativas | ✓ Activas | Migración `013` |
 | Cuarentena emails malformados | ✓ Aplicada | Migración `014` — 58 canales `REVIEW_REQUIRED` |
 | Calidad de datos | ✓ Score 87/100 | Reporte en `docs/data_quality_report.md` |
+| Gates pre-piloto | ⚠ Pendiente | Ver `docs/pre_pilot_gates.md` |
 | CI/CD a STAGING | ✓ Activo | GitHub Actions — rama `staging` |
 | Rama principal | ✓ Actualizada | `master` y `staging` apuntan al mismo commit base |
 | Supabase PROD | — No iniciado | Separar cuando STAGING esté curado |
@@ -47,6 +48,7 @@ estampados/
 │   └── run_db_tests.ps1
 ├── docs/
 │   ├── data_quality_report.md      # Reporte de calidad — corte 2026-08-25
+│   ├── pre_pilot_gates.md          # Bloqueos antes de campaña/piloto
 │   └── supabase-staging-setup.md   # Guía de configuración inicial
 ├── .github/
 │   └── workflows/
@@ -152,7 +154,7 @@ Los tests corren dentro de una transacción con `ROLLBACK` final — no modifica
 
 - Caso A: precio general correcto
 - Caso B: precio de variante gana sobre precio de producto
-- Caso C: rangos de cantidad solapados son rechazados
+- Caso C: rangos de cantidad solapados con `id_variante NULL` son rechazados
 - Caso D: vigencias solapadas son rechazadas
 - Caso E: cantidad fuera de escala → `PRICE_NOT_FOUND`
 - Caso F: moneda no soportada → `CURRENCY_NOT_SUPPORTED`
@@ -266,8 +268,11 @@ Hallazgos principales:
 - 824 ítems MEDIUM abiertos de revisión de organizaciones
 - `estado_calidad` catálogo: 934 `VALID`, 1 `NEEDS_REVIEW`
 - NaturalGraphic y Verona Studio tienen precios anómalos — no usar para costeo sin revisión
+- El score 87/100 no habilita campañas: validez y vigencia siguen siendo los riesgos más sensibles
 
 Reporte completo: [`docs/data_quality_report.md`](docs/data_quality_report.md)
+
+Bloqueos pre-piloto: [`docs/pre_pilot_gates.md`](docs/pre_pilot_gates.md)
 
 Para re-ejecutar el análisis:
 
@@ -283,9 +288,11 @@ python scripts/analytics/data_quality_probe.py > docs/data_quality_raw.json
 |---|---|
 | `SUPABASE_SERVICE_ROLE_KEY` solo en backend | Nunca en frontend, nunca en variables públicas |
 | `HMAC_SUPPRESSION_SECRET` fuera de PostgreSQL y Git | Se genera localmente, nunca se versiona |
+| Backup del `HMAC_SUPPRESSION_SECRET` | Debe guardarse en gestor seguro; si se pierde, no se pueden recalcular hashes compatibles |
 | `N8N_ENCRYPTION_KEY` fuera de Git | Cuando se configure n8n |
 | `.env.staging` excluida de Git | Verificar con `git status` antes de cada commit |
 | Datos PII fuera de Git | `scraping/data/raw/`, `scraping/data/processed/`, `scraping/data/web/`, `scraping/outputs/`, `outputs/` |
+| Retención de `import_raw_row` | Propuesta: purgar/anonimizar payloads crudos con PII después de 90 días |
 | Todo trabajo en STAGING | Ninguna escritura a producción hasta que STAGING esté curado |
 
 ---
@@ -295,7 +302,10 @@ python scripts/analytics/data_quality_probe.py > docs/data_quality_raw.json
 | Prioridad | Tarea |
 |---|---|
 | Alta | Corregir o invalidar los 58 emails en cuarentena (`REVIEW_REQUIRED`) |
+| Alta | Segmentar emails corporativos/rol/personales y no activar personales scrapeados sin consentimiento o base legal documentada |
 | Alta | No habilitar campañas hasta cambiar contactabilidad de `DESCONOCIDA` a base válida |
+| Alta | Validar buzones con servicio especializado antes del primer envío real |
+| Alta | Respaldar `HMAC_SUPPRESSION_SECRET` fuera del entorno y definir purga de `import_raw_row` |
 | Alta | Marcar NaturalGraphic y Verona como proveedores con revisión de precio obligatoria |
 | Media | Resolver los 824 ítems MEDIUM de revisión de organizaciones |
 | Media | Diseñar catálogo propio vendible: productos, variantes, costos, márgenes y escalas |

@@ -115,11 +115,16 @@ $$;
 -- ===========================================================
 -- CASO C — Insertar rangos de cantidad solapados debe fallar
 -- La constraint EXCLUDE debe rechazar el INSERT.
+-- Cobertura explícita del caso crítico: id_variante NULL vs id_variante NULL.
+-- Si la constraint usara id_variante directo, PostgreSQL permitiría el solape
+-- porque NULL no compara igual a NULL. Por eso este caso protege el COALESCE
+-- al UUID centinela definido en 006_prices_costs.sql.
 -- ===========================================================
 DO $$
 BEGIN
     BEGIN
-        -- Intento insertar un precio con rango qty que solapa [1,99) para el mismo producto/variante/vigencia
+        -- Intento insertar un precio genérico con id_variante NULL que solapa
+        -- otro precio genérico id_variante NULL: [1,99) para el mismo producto/vigencia.
         INSERT INTO precio_producto (
             id_precio, id_producto, id_variante,
             quantity_range, validity, precio_unitario, moneda
@@ -135,7 +140,7 @@ BEGIN
         RAISE EXCEPTION 'CASO C FAILED — Se esperaba error de exclusión por rangos solapados';
     EXCEPTION
         WHEN exclusion_violation THEN
-            RAISE NOTICE 'CASO C PASSED — Rangos de cantidad solapados rechazados correctamente';
+            RAISE NOTICE 'CASO C PASSED — Rangos solapados con id_variante NULL rechazados correctamente';
     END;
 END;
 $$;
