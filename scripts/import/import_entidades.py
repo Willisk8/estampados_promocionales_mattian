@@ -25,6 +25,7 @@ import openpyxl
 sys.path.insert(0, str(Path(__file__).parent))
 from _shared import (
     clean_value,
+    copy_into,
     file_sha256,
     load_env,
     register_batch,
@@ -67,156 +68,120 @@ def compute_email_hash(email: str, secret: str) -> str:
 # --------------------------------------------------------------------------- #
 
 def insert_organizacion(cur, records: list[dict]) -> int:
-    inserted = 0
-    for r in records:
-        cur.execute(
-            """
-            INSERT INTO organizacion (
-                id_organizacion, nit, nombre_legal, nombre_comercial, sigla,
-                tipo_entidad_origen, departamento, municipio, direccion,
-                fuente_registro, fecha_reporte_oficial, estado
-            ) VALUES (
-                %s, %s, %s, %s, %s,
-                %s, %s, %s, %s,
-                %s, %s, %s
-            )
-            ON CONFLICT (id_organizacion) DO NOTHING
-            """,
-            (
-                clean_value(r["id_organizacion"]),
-                clean_value(r["nit"]),
-                clean_value(r["nombre_legal"]),
-                clean_value(r["nombre_comercial"]),
-                clean_value(r["sigla"]),
-                clean_value(r["tipo_entidad_origen"]),
-                clean_value(r["departamento"]),
-                clean_value(r["municipio"]),
-                clean_value(r["direccion"]),
-                clean_value(r["fuente_registro"]),
-                clean_value(r["fecha_reporte_oficial"]),
-                clean_value(r.get("estado", "ACTIVE")),
-            ),
+    rows = [
+        (
+            clean_value(r["id_organizacion"]),
+            clean_value(r["nit"]),
+            clean_value(r["nombre_legal"]),
+            clean_value(r["nombre_comercial"]),
+            clean_value(r["sigla"]),
+            clean_value(r["tipo_entidad_origen"]),
+            clean_value(r["departamento"]),
+            clean_value(r["municipio"]),
+            clean_value(r["direccion"]),
+            clean_value(r["fuente_registro"]),
+            clean_value(r["fecha_reporte_oficial"]),
+            clean_value(r.get("estado", "ACTIVE")),
         )
-        if cur.rowcount:
-            inserted += 1
-    return inserted
+        for r in records
+    ]
+    return copy_into(
+        cur, "organizacion",
+        ["id_organizacion", "nit", "nombre_legal", "nombre_comercial", "sigla",
+         "tipo_entidad_origen", "departamento", "municipio", "direccion",
+         "fuente_registro", "fecha_reporte_oficial", "estado"],
+        rows, conflict_col="id_organizacion",
+    )
 
 
 def insert_persona(cur, records: list[dict]) -> int:
-    inserted = 0
-    for r in records:
-        cur.execute(
-            """
-            INSERT INTO persona (
-                id_persona, nombres, apellidos, nombre_completo,
-                tipo_documento, numero_documento_hash, estado
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (id_persona) DO NOTHING
-            """,
-            (
-                clean_value(r["id_persona"]),
-                clean_value(r["nombres"]),
-                clean_value(r["apellidos"]),
-                clean_value(r["nombre_completo"]),
-                clean_value(r["tipo_documento"]),
-                clean_value(r["numero_documento_hash"]),
-                clean_value(r.get("estado", "ACTIVE")),
-            ),
+    rows = [
+        (
+            clean_value(r["id_persona"]),
+            clean_value(r["nombres"]),
+            clean_value(r["apellidos"]),
+            clean_value(r["nombre_completo"]),
+            clean_value(r["tipo_documento"]),
+            clean_value(r["numero_documento_hash"]),
+            clean_value(r.get("estado", "ACTIVE")),
         )
-        if cur.rowcount:
-            inserted += 1
-    return inserted
+        for r in records
+    ]
+    return copy_into(
+        cur, "persona",
+        ["id_persona", "nombres", "apellidos", "nombre_completo",
+         "tipo_documento", "numero_documento_hash", "estado"],
+        rows, conflict_col="id_persona",
+    )
 
 
 def insert_persona_organizacion(cur, records: list[dict]) -> int:
-    inserted = 0
-    for r in records:
-        cur.execute(
-            """
-            INSERT INTO persona_organizacion (
-                id_persona_organizacion, id_persona, id_organizacion,
-                rol, cargo, area, fecha_inicio, fecha_fin, fuente, estado
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (id_persona_organizacion) DO NOTHING
-            """,
-            (
-                clean_value(r["id_persona_organizacion"]),
-                clean_value(r["id_persona"]),
-                clean_value(r["id_organizacion"]),
-                clean_value(r.get("rol", "CONTACTO")),
-                clean_value(r["cargo"]),
-                clean_value(r["area"]),
-                clean_value(r["fecha_inicio"]),
-                clean_value(r["fecha_fin"]),
-                clean_value(r["fuente"]),
-                clean_value(r.get("estado", "ACTIVE")),
-            ),
+    rows = [
+        (
+            clean_value(r["id_persona_organizacion"]),
+            clean_value(r["id_persona"]),
+            clean_value(r["id_organizacion"]),
+            clean_value(r.get("rol", "CONTACTO")),
+            clean_value(r["cargo"]),
+            clean_value(r["area"]),
+            clean_value(r["fecha_inicio"]),
+            clean_value(r["fecha_fin"]),
+            clean_value(r["fuente"]),
+            clean_value(r.get("estado", "ACTIVE")),
         )
-        if cur.rowcount:
-            inserted += 1
-    return inserted
+        for r in records
+    ]
+    return copy_into(
+        cur, "persona_organizacion",
+        ["id_persona_organizacion", "id_persona", "id_organizacion",
+         "rol", "cargo", "area", "fecha_inicio", "fecha_fin", "fuente", "estado"],
+        rows, conflict_col="id_persona_organizacion",
+    )
 
 
 def insert_canal_contacto(cur, records: list[dict], hmac_secret: str | None) -> int:
-    inserted = 0
+    rows = []
     for r in records:
         email_hash = clean_value(r.get("email_hash"))
         tipo = clean_value(r.get("tipo"))
         valor_norm = clean_value(r.get("valor_normalizado"))
-
-        # Calcular email_hash si falta y hay secreto disponible
         if tipo == "EMAIL" and valor_norm and not email_hash and hmac_secret:
             email_hash = compute_email_hash(valor_norm, hmac_secret)
-
-        cur.execute(
-            """
-            INSERT INTO canal_contacto (
-                id_canal_contacto, id_organizacion, id_persona,
-                tipo, valor_original, valor_normalizado,
-                email_hash, fuente, confianza, estado
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (id_canal_contacto) DO NOTHING
-            """,
-            (
-                clean_value(r["id_canal_contacto"]),
-                clean_value(r.get("id_organizacion")),
-                clean_value(r.get("id_persona")),
-                tipo,
-                clean_value(r["valor_original"]),
-                valor_norm,
-                email_hash,
-                clean_value(r["fuente"]),
-                clean_value(r.get("confianza", "UNKNOWN")),
-                clean_value(r.get("estado", "ACTIVE")),
-            ),
-        )
-        if cur.rowcount:
-            inserted += 1
-    return inserted
+        rows.append((
+            clean_value(r["id_canal_contacto"]),
+            clean_value(r.get("id_organizacion")),
+            clean_value(r.get("id_persona")),
+            tipo,
+            clean_value(r["valor_original"]),
+            valor_norm,
+            email_hash,
+            clean_value(r["fuente"]),
+            clean_value(r.get("confianza", "UNKNOWN")),
+            clean_value(r.get("estado", "ACTIVE")),
+        ))
+    return copy_into(
+        cur, "canal_contacto",
+        ["id_canal_contacto", "id_organizacion", "id_persona",
+         "tipo", "valor_original", "valor_normalizado",
+         "email_hash", "fuente", "confianza", "estado"],
+        rows, conflict_col="id_canal_contacto",
+    )
 
 
 def insert_contactabilidad_desconocida(cur, records: list[dict], source_name: str) -> int:
-    inserted = 0
-    for r in records:
-        canal_id = clean_value(r["id_canal_contacto"])
-        contactabilidad_id = stable_uuid("contactabilidad", canal_id)
-        cur.execute(
-            """
-            INSERT INTO contactabilidad (
-                id_contactabilidad, id_canal_contacto,
-                base_contacto_codigo, evidencia
-            ) VALUES (%s, %s, 'DESCONOCIDA', %s)
-            ON CONFLICT (id_contactabilidad) DO NOTHING
-            """,
-            (
-                contactabilidad_id,
-                canal_id,
-                f"Importacion {source_name}: base legal no confirmada",
-            ),
-        )
-        if cur.rowcount:
-            inserted += 1
-    return inserted
+    evidencia = f"Importacion {source_name}: base legal no confirmada"
+    rows = [
+        (stable_uuid("contactabilidad", clean_value(r["id_canal_contacto"])),
+         clean_value(r["id_canal_contacto"]),
+         "DESCONOCIDA",
+         evidencia)
+        for r in records
+    ]
+    return copy_into(
+        cur, "contactabilidad",
+        ["id_contactabilidad", "id_canal_contacto", "base_contacto_codigo", "evidencia"],
+        rows, conflict_col="id_contactabilidad",
+    )
 
 
 # --------------------------------------------------------------------------- #

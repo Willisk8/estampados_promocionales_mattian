@@ -22,6 +22,7 @@ import openpyxl
 sys.path.insert(0, str(Path(__file__).parent))
 from _shared import (
     clean_value,
+    copy_into,
     parse_jsonb,
     file_sha256,
     load_env,
@@ -56,90 +57,73 @@ def read_sheet(wb, sheet_name: str, limit: int | None = None) -> tuple[list[str]
 # --------------------------------------------------------------------------- #
 
 def insert_proveedor(cur, records: list[dict]) -> int:
-    inserted = 0
-    for r in records:
-        cur.execute(
-            """
-            INSERT INTO proveedor (id_proveedor, source_id, nombre, ciudad, pais, activo)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            ON CONFLICT (id_proveedor) DO NOTHING
-            """,
-            (
-                clean_value(r["id_proveedor"]),
-                clean_value(r["source_id"]),
-                clean_value(r["nombre"]),
-                clean_value(r["ciudad"]),
-                clean_value(r.get("pais", "CO")),
-                bool(r.get("activo", True)),
-            ),
+    rows = [
+        (
+            clean_value(r["id_proveedor"]),
+            clean_value(r["source_id"]),
+            clean_value(r["nombre"]),
+            clean_value(r["ciudad"]),
+            clean_value(r.get("pais", "CO")),
+            bool(r.get("activo", True)),
         )
-        if cur.rowcount:
-            inserted += 1
-    return inserted
+        for r in records
+    ]
+    return copy_into(
+        cur, "proveedor",
+        ["id_proveedor", "source_id", "nombre", "ciudad", "pais", "activo"],
+        rows, conflict_col="id_proveedor",
+    )
 
 
 def insert_producto_proveedor(cur, records: list[dict]) -> int:
-    inserted = 0
+    rows = []
     for r in records:
         tags_raw = clean_value(r.get("tags"))
-        # '{}'  o None → NULL; de lo contrario dejar como string de array PG
         tags = None if tags_raw in (None, "{}", "") else tags_raw
-
-        cur.execute(
-            """
-            INSERT INTO producto_proveedor (
-                id_producto_proveedor, id_proveedor, sku_proveedor,
-                nombre_original, categoria, tags, descripcion,
-                atributos, url_producto, estado_calidad, motivo_revision
-            ) VALUES (%s, %s, %s, %s, %s, %s::text[], %s, %s::jsonb, %s, %s, %s)
-            ON CONFLICT (id_producto_proveedor) DO NOTHING
-            """,
-            (
-                clean_value(r["id_producto_proveedor"]),
-                clean_value(r["id_proveedor"]),
-                clean_value(r.get("sku_proveedor")),
-                clean_value(r["nombre_original"]),
-                clean_value(r.get("categoria")),
-                tags,
-                clean_value(r.get("descripcion")),
-                json.dumps(parse_jsonb(r.get("atributos"))),
-                clean_value(r.get("url_producto")),
-                clean_value(r.get("estado_calidad", "PENDING_REVIEW")),
-                clean_value(r.get("motivo_revision")),
-            ),
-        )
-        if cur.rowcount:
-            inserted += 1
-    return inserted
+        rows.append((
+            clean_value(r["id_producto_proveedor"]),
+            clean_value(r["id_proveedor"]),
+            clean_value(r.get("sku_proveedor")),
+            clean_value(r["nombre_original"]),
+            clean_value(r.get("categoria")),
+            tags,
+            clean_value(r.get("descripcion")),
+            json.dumps(parse_jsonb(r.get("atributos"))),
+            clean_value(r.get("url_producto")),
+            clean_value(r.get("estado_calidad", "PENDING_REVIEW")),
+            clean_value(r.get("motivo_revision")),
+        ))
+    return copy_into(
+        cur, "producto_proveedor",
+        ["id_producto_proveedor", "id_proveedor", "sku_proveedor",
+         "nombre_original", "categoria", "tags", "descripcion",
+         "atributos", "url_producto", "estado_calidad", "motivo_revision"],
+        rows, conflict_col="id_producto_proveedor",
+    )
 
 
 def insert_precio_proveedor_snapshot(cur, records: list[dict]) -> int:
-    inserted = 0
-    for r in records:
-        cur.execute(
-            """
-            INSERT INTO precio_proveedor_snapshot (
-                id_snapshot, id_producto_proveedor, precio_publicado, moneda,
-                precio_texto_original, visibilidad, disponibilidad,
-                url_fuente, observado_en
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (id_snapshot) DO NOTHING
-            """,
-            (
-                clean_value(r["id_snapshot"]),
-                clean_value(r["id_producto_proveedor"]),
-                clean_value(r["precio_publicado"]),
-                clean_value(r.get("moneda", "COP")),
-                clean_value(r.get("precio_texto_original")),
-                clean_value(r.get("visibilidad")),
-                clean_value(r.get("disponibilidad")),
-                clean_value(r.get("url_fuente")),
-                clean_value(r.get("observado_en")),
-            ),
+    rows = [
+        (
+            clean_value(r["id_snapshot"]),
+            clean_value(r["id_producto_proveedor"]),
+            clean_value(r["precio_publicado"]),
+            clean_value(r.get("moneda", "COP")),
+            clean_value(r.get("precio_texto_original")),
+            clean_value(r.get("visibilidad")),
+            clean_value(r.get("disponibilidad")),
+            clean_value(r.get("url_fuente")),
+            clean_value(r.get("observado_en")),
         )
-        if cur.rowcount:
-            inserted += 1
-    return inserted
+        for r in records
+    ]
+    return copy_into(
+        cur, "precio_proveedor_snapshot",
+        ["id_snapshot", "id_producto_proveedor", "precio_publicado", "moneda",
+         "precio_texto_original", "visibilidad", "disponibilidad",
+         "url_fuente", "observado_en"],
+        rows, conflict_col="id_snapshot",
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -157,7 +141,6 @@ def run(file_path: str, limit: int | None, dry_run: bool):
     _, productos = read_sheet(wb, "producto_proveedor", limit)
     prod_ids = {r["id_producto_proveedor"] for r in productos}
 
-    # Filtrar snapshots que corresponden a los productos cargados
     _, snapshots = read_sheet(wb, "precio_proveedor_snapshot")
     if limit is not None:
         snapshots = [s for s in snapshots if s["id_producto_proveedor"] in prod_ids]

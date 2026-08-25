@@ -102,12 +102,19 @@ def register_batch(conn, source_name: str, source_path: str, sha256: str, row_co
             """
             SELECT id_import_batch FROM import_batch
             WHERE source_name = %s AND source_sha256 = %s
+              AND import_status NOT IN ('FAILED')
             """,
             (source_name, sha256),
         )
         row = cur.fetchone()
         if row:
-            return None  # ya importado
+            return None  # ya importado (COMPLETED o RUNNING)
+
+        # Limpiar intentos fallidos anteriores para permitir reintento
+        cur.execute(
+            "DELETE FROM import_batch WHERE source_name = %s AND source_sha256 = %s AND import_status = 'FAILED'",
+            (source_name, sha256),
+        )
 
         cur.execute(
             """
@@ -123,6 +130,39 @@ def register_batch(conn, source_name: str, source_path: str, sha256: str, row_co
     return str(batch_id)
 
 
+def copy_into(
+    cur,
+    table: str,
+    columns: list[str],
+    rows: list[tuple],
+    conflict_col: str | None = None,
+) -> int:
+    """
+    Carga filas vía COPY FROM STDIN → tabla temporal → INSERT con ON CONFLICT DO NOTHING.
+    Requiere Session pooler (puerto 5432). No usar con Transaction pooler (6543).
+    """
+    if not rows:
+        return 0
+    col_list = ", ".join(columns)
+    tmp = f"_itmp_{table}"
+
+    cur.execute(f"DROP TABLE IF EXISTS {tmp}")
+    cur.execute(f"CREATE TEMP TABLE {tmp} (LIKE {table} INCLUDING DEFAULTS)")
+    with cur.copy(f"COPY {tmp} ({col_list}) FROM STDIN") as copy:
+        for row in rows:
+            copy.write_row(row)
+    if conflict_col:
+        cur.execute(
+            f"INSERT INTO {table} ({col_list}) SELECT {col_list} FROM {tmp}"
+            f" ON CONFLICT ({conflict_col}) DO NOTHING"
+        )
+    else:
+        cur.execute(f"INSERT INTO {table} ({col_list}) SELECT {col_list} FROM {tmp}")
+    inserted = cur.rowcount
+    cur.execute(f"DROP TABLE {tmp}")
+    return inserted
+
+
 def register_raw_rows(
     cur,
     batch_id: str,
@@ -132,8 +172,10 @@ def register_raw_rows(
     target_table: str,
     target_id_key: str,
     entity_kind: str,
+    chunk_size: int = None,  # ignorado — COPY no necesita chunks
 ) -> int:
-    inserted = 0
+    """Registra filas en import_raw_row vía COPY FROM STDIN."""
+    rows = []
     for offset, record in enumerate(records):
         source_row_number = record.get("__sheet_row_number", offset + 2)
         row_number = start_row_number + offset
@@ -141,28 +183,20 @@ def register_raw_rows(
         payload["_sheet"] = sheet_name
         payload["_sheet_row_number"] = source_row_number
         target_id = clean_value(record.get(target_id_key))
-
-        cur.execute(
-            """
-            INSERT INTO import_raw_row (
-                id_import_batch, row_number, raw_payload, normalized_payload,
-                entity_kind, match_status, target_table, target_id
-            ) VALUES (%s, %s, %s::jsonb, %s::jsonb, %s, 'IMPORTED', %s, %s)
-            ON CONFLICT (id_import_batch, row_number) DO NOTHING
-            """,
-            (
-                batch_id,
-                row_number,
-                json.dumps(payload, default=str, ensure_ascii=False),
-                json.dumps(payload, default=str, ensure_ascii=False),
-                entity_kind,
-                target_table,
-                target_id,
-            ),
-        )
-        if cur.rowcount:
-            inserted += 1
-    return inserted
+        payload_json = json.dumps(payload, default=str, ensure_ascii=False)
+        rows.append((
+            batch_id, row_number,
+            payload_json, payload_json,
+            entity_kind, "IMPORTED",
+            target_table, target_id,
+        ))
+    return copy_into(
+        cur, "import_raw_row",
+        ["id_import_batch", "row_number", "raw_payload", "normalized_payload",
+         "entity_kind", "match_status", "target_table", "target_id"],
+        rows,
+        conflict_col="id_import_batch, row_number",
+    )
 
 
 def register_review_items(

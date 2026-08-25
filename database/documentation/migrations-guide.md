@@ -19,6 +19,7 @@ Aplicar en orden numérico estricto. Cada migración depende de las anteriores.
 | `010_import_staging.sql` | Lotes de importación, filas raw y cola de revisión |
 | `011_security_hardening.sql` | Hardening de funciones: search_path fijo y revocación a anon/authenticated |
 | `012_revoke_public_execute.sql` | Revoca EXECUTE a PUBLIC en funciones SECURITY DEFINER |
+| `013_operational_views.sql` | Vistas operativas para CRM, revisión de importación, calidad de catálogo y elegibilidad |
 
 ## Cómo aplicar en Supabase Staging
 
