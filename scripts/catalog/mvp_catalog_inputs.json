@@ -93,7 +93,7 @@
           {"name": "Espalda", "width_cm": 25, "height_cm": 30, "units_per_product": 1}
         ],
         "iron": {
-          "include": false,
+          "include": true,
           "watts": 2000,
           "seconds": 160,
           "passes": 2,
