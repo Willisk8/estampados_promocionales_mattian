@@ -9,7 +9,7 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 | Componente | Estado | Detalle |
 |---|---|---|
 | Infraestructura Supabase STAGING | ✓ Completo | Proyecto `psereyjwjpyakkmnabgm`, región us-west-2 Oregon |
-| Migraciones `000`–`019` | ✓ Aplicadas/pendientes CI | 20 migraciones numeradas; deploy idempotente vía `schema_migrations` |
+| Migraciones `000`–`020` | ✓ Aplicadas/pendientes CI | 21 migraciones numeradas; deploy idempotente vía `schema_migrations` |
 | Motor de precios (`resolve_price`) | ✓ Operativo | Tests A–F pasando |
 | CRM — organizaciones y personas | ✓ Cargado | 5,639 organizaciones · 4,642 personas |
 | CRM — canales de contacto | ✓ Cargado | 16,211 canales (email, teléfono, WhatsApp, web) |
@@ -149,6 +149,7 @@ No usar scripts no idempotentes para migraciones. El único flujo manual soporta
 | `017_supplier_price_purchase_terms.sql` | Agrega condiciones de compra proveedor para costos variables |
 | `018_audit_hardening.sql` | Bloquea variantes inactivas y deduplica historial en elegibilidad CRM |
 | `019_channel_scoped_campaign_eligibility.sql` | Corrige elegibilidad por canal cuando `018` ya fue aplicada en STAGING |
+| `020_require_email_hash_for_campaign_eligibility.sql` | Exige HMAC para elegibilidad y evita omitir supresión global |
 
 ### Convenciones obligatorias
 

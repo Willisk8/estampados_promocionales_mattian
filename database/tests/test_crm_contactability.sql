@@ -149,6 +149,47 @@ BEGIN
 END;
 $$;
 
+-- Un canal email sin HMAC no puede ser elegible aunque tenga consentimiento:
+-- no se podria comprobar contra supresion global.
+INSERT INTO canal_contacto (
+    id_canal_contacto, id_organizacion, tipo, valor_original,
+    valor_normalizado, email_hash, fuente, confianza
+) VALUES (
+    '00000000-0000-4000-b000-000000000013',
+    '00000000-0000-4000-b000-000000000001',
+    'EMAIL',
+    'SinHash@Testcrm.example',
+    'sinhash@testcrm.example',
+    NULL,
+    'fixture',
+    'HIGH'
+);
+
+INSERT INTO contactabilidad (
+    id_contactabilidad, id_canal_contacto, base_contacto_codigo,
+    evidencia, valido_desde, valido_hasta
+) VALUES (
+    '00000000-0000-4000-b000-000000000014',
+    '00000000-0000-4000-b000-000000000013',
+    'CONSENTIMIENTO_EXPRESO',
+    'Fixture consentimiento con hash nulo',
+    now(),
+    NULL
+);
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    SELECT * INTO r
+    FROM fn_email_eligible_for_campaign('00000000-0000-4000-b000-000000000013'::uuid);
+    ASSERT r.eligible = false, 'email without HMAC hash should not be eligible';
+    ASSERT r.reason = 'EMAIL_HASH_REQUIRED',
+        'expected EMAIL_HASH_REQUIRED for null email_hash, got ' || COALESCE(r.reason, 'NULL');
+    RAISE NOTICE 'PASSED - null email_hash fails closed';
+END;
+$$;
+
 -- La fila efectiva mas reciente debe gobernar la vista y la elegibilidad.
 -- Un NO_CONTACTAR vigente debe vencer un consentimiento previo que siga abierto.
 INSERT INTO contactabilidad (

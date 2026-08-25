@@ -6,12 +6,10 @@
 -- Se marcan REVIEW_REQUIRED y se abre un item de revision enlazado
 -- a import_raw_row para conservar trazabilidad al archivo/fila origen.
 --
--- ONE-TIME BACKFILL:
--- Esta migracion asume que ya se importo la base completa
--- base_consolidada_contactos.csv que produjo 58 canales con estos dominios
--- malformados. En una base vacia o con otra fuente, el guardia de conteo debe
--- revisarse antes de aplicar porque protege contra datos inesperados, no contra
--- todos los posibles estados de entorno.
+-- BACKFILL SEGURO EN BASES VACIAS:
+-- Opera sobre cero o mas coincidencias. La verificacion historica de "58"
+-- pertenece al reporte posterior a la carga, no a la construccion limpia del
+-- esquema en CI.
 -- ============================================================
 
 DO $$
@@ -19,6 +17,9 @@ DECLARE
     v_target_count INTEGER;
     v_with_raw_count INTEGER;
 BEGIN
+    -- SYNC CON: scripts/import/import_entidades.py MALFORMED_EMAIL_DOMAINS,
+    -- database/migrations/018_audit_hardening.sql y
+    -- database/migrations/019_channel_scoped_campaign_eligibility.sql.
     WITH malformed_domains(domain) AS (
         VALUES
             ('coomservi.combogot'),
@@ -44,12 +45,6 @@ BEGIN
       ON irr.target_table = 'canal_contacto'
      AND irr.target_id = t.id_canal_contacto;
 
-    IF v_target_count <> 58 THEN
-        RAISE EXCEPTION
-            'Expected 58 malformed email channels, found %. Review quarantine migration before applying.',
-            v_target_count;
-    END IF;
-
     IF v_with_raw_count <> v_target_count THEN
         RAISE EXCEPTION
             'Malformed email channels without import_raw_row traceability: %',
@@ -58,6 +53,9 @@ BEGIN
 END $$;
 
 WITH malformed_domains(domain) AS (
+    -- SYNC CON: scripts/import/import_entidades.py MALFORMED_EMAIL_DOMAINS,
+    -- database/migrations/018_audit_hardening.sql y
+    -- database/migrations/019_channel_scoped_campaign_eligibility.sql.
     VALUES
         ('coomservi.combogot'),
         ('colegiocoomeva.edu.codocente'),

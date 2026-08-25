@@ -67,7 +67,10 @@ def compute_email_hash(email: str, secret: str) -> str:
 
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 MALFORMED_EMAIL_DOMAINS = frozenset({
-    # Debe mantenerse alineado con database/migrations/014_quarantine_malformed_email_domains.sql.
+    # SYNC CON:
+    # - database/migrations/014_quarantine_malformed_email_domains.sql
+    # - database/migrations/018_audit_hardening.sql
+    # - database/migrations/019_channel_scoped_campaign_eligibility.sql
     "coomservi.combogot",
     "colegiocoomeva.edu.codocente",
     "fbcsena.comauxiliar",

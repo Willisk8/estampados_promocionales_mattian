@@ -70,6 +70,11 @@ BEGIN
         RETURN;
     END IF;
 
+    IF v_email_hash IS NULL OR btrim(v_email_hash) = '' THEN
+        RETURN QUERY SELECT false, 'EMAIL_HASH_REQUIRED';
+        RETURN;
+    END IF;
+
     SELECT EXISTS (
         SELECT 1
         FROM supresion s
@@ -187,6 +192,9 @@ SELECT
     eb.*,
     CASE
         WHEN eb.domain IN (
+            -- SYNC CON: scripts/import/import_entidades.py MALFORMED_EMAIL_DOMAINS,
+            -- database/migrations/014_quarantine_malformed_email_domains.sql y
+            -- database/migrations/018_audit_hardening.sql.
             'coomservi.combogot',
             'colegiocoomeva.edu.codocente',
             'fbcsena.comauxiliar'
@@ -226,6 +234,9 @@ SELECT
     END AS email_segmento,
     CASE
         WHEN eb.domain IN (
+            -- SYNC CON: scripts/import/import_entidades.py MALFORMED_EMAIL_DOMAINS,
+            -- database/migrations/014_quarantine_malformed_email_domains.sql y
+            -- database/migrations/018_audit_hardening.sql.
             'coomservi.combogot',
             'colegiocoomeva.edu.codocente',
             'fbcsena.comauxiliar'
