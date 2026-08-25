@@ -1,13 +1,14 @@
 # Reporte de calidad de datos - Supabase STAGING
 
-Fecha de corte: 2026-08-24  
-Base evaluada: Supabase STAGING, migraciones `000` a `012`, cargas piloto y full de entidades/catalogo.
+Fecha de corte: 2026-08-25
+
+Base evaluada: Supabase STAGING, migraciones `000` a `014`, cargas piloto y full de entidades/catalogo.
 
 ## Veredicto ejecutivo
 
 Score operativo estimado: **87/100**.
 
-La base ya esta lista para trabajo interno de CRM, curacion comercial y analisis de catalogo proveedor. No esta lista aun para campanas automatizadas: todos los contactos entraron con contactabilidad `DESCONOCIDA` y hay 824 items abiertos de revision.
+La base ya esta lista para trabajo interno de CRM, curacion comercial y analisis de catalogo proveedor. No esta lista aun para campanas automatizadas: todos los contactos entraron con contactabilidad `DESCONOCIDA` y hay 824 items MEDIUM abiertos de revision, mas 58 items HIGH por emails malformados puestos en cuarentena.
 
 ## KPIs principales
 
@@ -20,7 +21,7 @@ La base ya esta lista para trabajo interno de CRM, curacion comercial y analisis
 | Contactabilidad | 16,211 | Paridad 1:1 con canales |
 | Batches de importacion | 4 | Piloto y full separados |
 | Filas raw trazables | 33,399 | Trazabilidad completa por batch |
-| Items abiertos de revision | 824 | Deben revisarse antes de activar uso comercial |
+| Items abiertos de revision | 882 | 824 MEDIUM + 58 HIGH; deben revisarse antes de activar uso comercial |
 
 ## Cobertura
 
@@ -91,9 +92,9 @@ Top dominios:
 | usbmed.edu.co | 72 | Institucional |
 | cooprudea.com | 71 | Corporativo |
 | outlook.com | 58 | Personal |
-| coomservi.combogot | 28 | Revisar malformacion |
-| colegiocoomeva.edu.codocente | 19 | Revisar malformacion |
-| fbcsena.comauxiliar | 11 | Revisar malformacion |
+| coomservi.combogot | 28 | En cuarentena: canal `REVIEW_REQUIRED` |
+| colegiocoomeva.edu.codocente | 19 | En cuarentena: canal `REVIEW_REQUIRED` |
+| fbcsena.comauxiliar | 11 | En cuarentena: canal `REVIEW_REQUIRED` |
 
 ## Catalogo proveedor
 
@@ -104,6 +105,15 @@ Top dominios:
 | Snapshots de precio | 934 |
 | Productos validos | 934 |
 | Productos en revision | 1 |
+
+Valores reales de `estado_calidad` en STAGING:
+
+| estado_calidad | Productos |
+|---|---:|
+| VALID | 934 |
+| NEEDS_REVIEW | 1 |
+
+Nota: el hallazgo externo que comparaba contra `OK` fue cerrado como falso positivo. El enum vigente del esquema es `VALID`, no `OK`.
 
 Distribucion por proveedor:
 
@@ -137,20 +147,23 @@ Distribucion de precios:
 | OK | `contactabilidad` tiene paridad 1:1 con `canal_contacto` | Cerrado |
 | OK | `email_hash` calculado para todos los emails | Cerrado |
 | OK | Catalogo proveedor cargado completo | Cerrado |
+| OK | `estado_calidad` validado: 934 `VALID`, 1 `NEEDS_REVIEW` | Cerrado |
+| OK | 58 emails con dominios malformados marcados `REVIEW_REQUIRED` con trazabilidad raw | Cerrado |
 | Advertencia | 824 items abiertos de revision | Requiere curacion |
+| Advertencia | 58 items HIGH por dominios malformados en cuarentena | Requiere correccion manual o invalidacion |
 | Advertencia | 47.36% de emails son personales | Segmentar antes de contactar |
 | Advertencia | 575 websites son candidatos, no necesariamente validacion manual | Mantener confianza separada |
 | Advertencia | `nombre_comercial` tiene 0% de completitud | Definir fuente o dejar fuera del MVP |
-| Advertencia | Dominios malformados detectados por concatenacion | Crear limpieza especifica |
+| Advertencia | Dominios malformados detectados por concatenacion | Cuarentena aplicada; falta resolver valores finales |
 | Error de datos | Precios extremos en NaturalGraphic, Verona y algunos productos de Esferos.com | Revisar antes de usar para margenes |
 
 ## Recomendaciones priorizadas
 
 | Prioridad | Recomendacion |
 |---|---|
-| Alta | Resolver o clasificar los 824 `import_review_item` abiertos antes de campanas. |
+| Alta | Resolver o clasificar los 882 `import_review_item` abiertos antes de campanas. |
 | Alta | No habilitar campanas hasta cambiar contactabilidad de `DESCONOCIDA` a una base valida y auditable. |
-| Alta | Crear regla de cuarentena para emails/dominos malformados por concatenacion. |
+| Alta | Corregir manualmente o invalidar los 58 emails con dominios malformados ya puestos en cuarentena. |
 | Alta | Marcar NaturalGraphic y Verona como proveedores con revision de precio antes de costeo. |
 | Media | Crear vista `vw_organizacion_contacto_resumen` para CRM y validacion diaria. |
 | Media | Crear reporte de organizaciones sin contacto o con solo email personal. |
