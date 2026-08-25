@@ -334,4 +334,60 @@ BEGIN
 END;
 $$;
 
+INSERT INTO import_batch (
+    id_import_batch, source_name, source_path, source_sha256,
+    source_row_count, import_status, started_at, finished_at, created_at
+) VALUES (
+    '00000000-0000-4000-b000-000000000013',
+    'fixture_retention',
+    'fixture.csv',
+    'fixture-retention-sha',
+    1,
+    'COMPLETED',
+    now() - interval '120 days',
+    now() - interval '120 days',
+    now() - interval '120 days'
+);
+
+INSERT INTO import_raw_row (
+    id_import_raw_row, id_import_batch, row_number, raw_payload,
+    normalized_payload, entity_kind, match_status, target_table, target_id,
+    created_at
+) VALUES (
+    '00000000-0000-4000-b000-000000000014',
+    '00000000-0000-4000-b000-000000000013',
+    1,
+    '{"email":"persona@example.com","telefono":"3001234567"}'::jsonb,
+    '{"email":"persona@example.com"}'::jsonb,
+    'OTHER',
+    'IMPORTED',
+    'canal_contacto',
+    '00000000-0000-4000-b000-000000000011',
+    now() - interval '120 days'
+);
+
+DO $$
+DECLARE
+    v_count INTEGER;
+    v_raw JSONB;
+    v_target UUID;
+BEGIN
+    SELECT fn_anonymize_import_raw_rows(90, true) INTO v_count;
+    ASSERT v_count >= 1, 'dry-run should count at least one old raw row';
+
+    SELECT fn_anonymize_import_raw_rows(90, false) INTO v_count;
+    ASSERT v_count >= 1, 'apply should anonymize at least one old raw row';
+
+    SELECT raw_payload, target_id
+      INTO v_raw, v_target
+      FROM import_raw_row
+     WHERE id_import_raw_row = '00000000-0000-4000-b000-000000000014';
+
+    ASSERT v_raw->>'_anonymized' = 'true', 'raw_payload should be anonymized';
+    ASSERT v_target = '00000000-0000-4000-b000-000000000011'::uuid,
+        'target_id lineage should be preserved';
+    RAISE NOTICE 'PASSED - import_raw_row retention anonymizes PII payloads and preserves lineage';
+END;
+$$;
+
 ROLLBACK;
