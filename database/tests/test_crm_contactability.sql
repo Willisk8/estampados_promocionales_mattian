@@ -117,6 +117,32 @@ BEGIN
 END;
 $$;
 
+INSERT INTO canal_contacto (
+    id_canal_contacto, id_organizacion, tipo, valor_original,
+    valor_normalizado, email_hash, fuente, confianza
+) VALUES (
+    '00000000-0000-4000-b000-000000000015',
+    '00000000-0000-4000-b000-000000000001',
+    'EMAIL',
+    'SinContactabilidad@Testcrm.example',
+    'sincontactabilidad@testcrm.example',
+    'hash-fixture-sin-contactabilidad-testcrm',
+    'fixture',
+    'HIGH'
+);
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    SELECT * INTO r FROM fn_email_eligible_for_campaign('00000000-0000-4000-b000-000000000015'::uuid);
+    ASSERT r.eligible = false, 'channel without contactability should not be eligible';
+    ASSERT r.reason = 'NO_CONTACTABILITY_RECORD',
+        'expected NO_CONTACTABILITY_RECORD, got ' || COALESCE(r.reason, 'NULL');
+    RAISE NOTICE 'PASSED - missing contactability record has explicit reason';
+END;
+$$;
+
 -- Un consentimiento futuro no debe ser efectivo ni aparecer como base vigente.
 INSERT INTO contactabilidad (
     id_contactabilidad, id_canal_contacto, base_contacto_codigo,

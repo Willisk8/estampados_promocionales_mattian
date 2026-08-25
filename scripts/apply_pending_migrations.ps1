@@ -65,7 +65,10 @@ function ConvertTo-PsqlIncludePath {
         [Parameter(Mandatory = $true)]
         [string]$Value
     )
-    return $Value.Replace("\", "/").Replace("'", "''")
+    # psql \i recibe un path de filesystem entre comillas simples. Dentro de
+    # ese contexto una comilla simple se escapa con backslash, no duplicandola
+    # como literal SQL.
+    return $Value.Replace("\", "/").Replace("'", "\'")
 }
 
 if (-not (Get-Command psql -ErrorAction SilentlyContinue)) {
