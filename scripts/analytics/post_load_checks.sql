@@ -51,6 +51,21 @@ FROM canal_contacto
 WHERE tipo = 'EMAIL'
   AND email_hash IS NULL;
 
+-- Emails con dominios malformados conocidos: deben quedar en REVIEW_REQUIRED
+SELECT
+    lower(split_part(valor_normalizado, '@', 2)) AS dominio,
+    estado,
+    COUNT(*) AS canales
+FROM canal_contacto
+WHERE tipo = 'EMAIL'
+  AND lower(split_part(valor_normalizado, '@', 2)) IN (
+      'coomservi.combogot',
+      'colegiocoomeva.edu.codocente',
+      'fbcsena.comauxiliar'
+  )
+GROUP BY dominio, estado
+ORDER BY dominio, estado;
+
 -- Contactos elegibles para campana: debe ser 0 hasta confirmar base legal
 SELECT
     COUNT(*) AS contactos_elegibles_sin_confirmacion

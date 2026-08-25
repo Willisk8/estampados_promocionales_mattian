@@ -20,6 +20,7 @@ Aplicar en orden numérico estricto. Cada migración depende de las anteriores.
 | `011_security_hardening.sql` | Hardening de funciones: search_path fijo y revocación a anon/authenticated |
 | `012_revoke_public_execute.sql` | Revoca EXECUTE a PUBLIC en funciones SECURITY DEFINER |
 | `013_operational_views.sql` | Vistas operativas para CRM, revisión de importación, calidad de catálogo y elegibilidad |
+| `014_quarantine_malformed_email_domains.sql` | Marca 58 emails con dominios malformados como `REVIEW_REQUIRED` y abre revisión trazable |
 
 ## Cómo aplicar en Supabase Staging
 
