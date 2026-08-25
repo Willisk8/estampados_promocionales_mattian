@@ -49,11 +49,17 @@ if (-not $DatabaseUrl) {
 
 Invoke-PsqlChecked `
     -Arguments @($DatabaseUrl, "-v", "ON_ERROR_STOP=1", "-c", @"
-CREATE TABLE IF NOT EXISTS schema_migrations (
+CREATE TABLE IF NOT EXISTS public.schema_migrations (
     filename TEXT PRIMARY KEY,
     applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY;
+-- Se califica con public. porque Supabase tiene otras tablas llamadas
+-- schema_migrations en los esquemas auth y realtime.
+ALTER TABLE public.schema_migrations
+    ADD COLUMN IF NOT EXISTS checksum_sha256 TEXT;
+ALTER TABLE public.schema_migrations
+    ADD COLUMN IF NOT EXISTS checksum_backfilled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.schema_migrations ENABLE ROW LEVEL SECURITY;
 DO `$`$ BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_policies
@@ -74,14 +80,40 @@ $migrations = Get-ChildItem -LiteralPath $MigrationsDir -Filter "*.sql" |
 foreach ($migration in $migrations) {
     $filename = $migration.Name
     $filenameLiteral = ConvertTo-PsqlLiteral $filename
-    $alreadyApplied = & psql $DatabaseUrl -At -v ON_ERROR_STOP=1 -c "SELECT 1 FROM schema_migrations WHERE filename = $filenameLiteral;"
+    $checksum = (Get-FileHash -Algorithm SHA256 -LiteralPath $migration.FullName).Hash.ToLower()
+    $checksumLiteral = ConvertTo-PsqlLiteral $checksum
+
+    $registered = & psql $DatabaseUrl -At -F "|" -v ON_ERROR_STOP=1 -c `
+        "SELECT coalesce(checksum_sha256, ''), checksum_backfilled FROM public.schema_migrations WHERE filename = $filenameLiteral;"
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0) {
         throw "psql fallo ($exitCode): consultar schema_migrations para $filename"
     }
 
-    if ($alreadyApplied -eq "1") {
-        Write-Host "Saltando $filename (ya aplicada)."
+    if ($registered) {
+        $parts = ([string]$registered).Split("|", 2)
+        $recordedChecksum = $parts[0]
+        $backfilled = ($parts.Count -gt 1 -and $parts[1] -eq "t")
+
+        if (-not $recordedChecksum) {
+            Write-Host "Saltando $filename (ya aplicada, sin checksum registrado)."
+        }
+        elseif ($recordedChecksum -eq $checksum) {
+            Write-Host "Saltando $filename (ya aplicada, checksum coincide)."
+        }
+        elseif ($backfilled) {
+            # El checksum se registro despues de aplicar la migracion, asi que
+            # no sabemos si el archivo cambio antes o despues de ese registro.
+            Write-Warning "$filename cambio respecto al checksum reconstruido. Revisar manualmente."
+        }
+        else {
+            throw @"
+$filename ya fue aplicada y su contenido cambio.
+  registrado: $recordedChecksum
+  actual:     $checksum
+Una migracion aplicada no se edita: crea una migracion nueva.
+"@
+        }
         continue
     }
 
@@ -92,7 +124,8 @@ foreach ($migration in $migrations) {
 \set ON_ERROR_STOP on
 BEGIN;
 \i '$migrationPath'
-INSERT INTO schema_migrations (filename) VALUES ($filenameLiteral);
+INSERT INTO public.schema_migrations (filename, checksum_sha256, checksum_backfilled)
+VALUES ($filenameLiteral, $checksumLiteral, false);
 COMMIT;
 "@
     Set-Content -LiteralPath $scriptPath -Value $script -Encoding UTF8
