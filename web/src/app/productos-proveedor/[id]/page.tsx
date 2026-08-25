@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
 import { SinAcceso } from "@/componentes/sin-acceso";
+import { firmarImagenes } from "@/lib/imagenes";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,7 @@ export default async function PaginaProductoProveedor({
   const p = prod.data;
   const proveedor = p.proveedor as { id_proveedor: string; nombre: string } | null;
   const historico = snaps.data ?? [];
+  const imagen = (await firmarImagenes([id])).get(id) ?? null;
 
   return (
     <>
@@ -73,8 +75,31 @@ export default async function PaginaProductoProveedor({
       )}
 
       <h2>Ficha</h2>
-      <div className="tarjeta">
-        <dl className="datos">
+      <div className="tarjeta" style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+        {imagen ? (
+          <figure style={{ margin: 0, flexShrink: 0 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imagen.url}
+              alt={p.nombre_original}
+              style={{
+                width: 190,
+                height: 190,
+                objectFit: "contain",
+                borderRadius: 8,
+                background: "var(--fondo)",
+                display: "block",
+              }}
+            />
+            <figcaption style={{ fontSize: 11.5, color: "var(--texto-suave)", marginTop: 6 }}>
+              Copia guardada
+              {imagen.capturada_en
+                ? ` el ${new Date(imagen.capturada_en).toLocaleDateString("es-CO")}`
+                : ""}
+            </figcaption>
+          </figure>
+        ) : null}
+        <dl className="datos" style={{ flex: 1 }}>
           <dt>SKU proveedor</dt>
           <dd>{p.sku_proveedor ?? "—"}</dd>
           <dt>Descripcion</dt>

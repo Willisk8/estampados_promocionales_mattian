@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
 import { SinAcceso } from "@/componentes/sin-acceso";
+import { firmarImagenes } from "@/lib/imagenes";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,7 @@ export default async function PaginaProveedor({
   }
 
   const lista = (productos.data ?? []) as unknown as ProductoProveedor[];
+  const imagenes = await firmarImagenes(lista.map((p) => p.id_producto_proveedor));
 
   return (
     <>
@@ -82,6 +84,7 @@ export default async function PaginaProveedor({
         <table>
           <thead>
             <tr>
+              <th></th>
               <th>Producto</th>
               <th>SKU proveedor</th>
               <th>Categoria</th>
@@ -101,6 +104,20 @@ export default async function PaginaProveedor({
               const ultimo = snaps[0];
               return (
                 <tr key={p.id_producto_proveedor}>
+                  <td>
+                    {imagenes.get(p.id_producto_proveedor) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={imagenes.get(p.id_producto_proveedor)!.url}
+                        alt={p.nombre_original}
+                        width={44}
+                        height={44}
+                        style={{ objectFit: "cover", borderRadius: 6, display: "block" }}
+                      />
+                    ) : (
+                      <span style={{ color: "var(--texto-suave)", fontSize: 11 }}>sin img</span>
+                    )}
+                  </td>
                   <td>
                     <Link href={`/productos-proveedor/${p.id_producto_proveedor}`}>
                       {p.nombre_original}

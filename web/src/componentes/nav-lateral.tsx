@@ -7,6 +7,7 @@ const ENLACES = [
   { href: "/", texto: "Resumen" },
   { href: "/organizaciones", texto: "Organizaciones" },
   { href: "/proveedores", texto: "Proveedores" },
+  { href: "/productos-propios", texto: "Productos propios" },
   { href: "/tecnicas", texto: "Tecnicas de marcacion" },
   { href: "/importaciones", texto: "Importaciones" },
   { href: "/cotizador", texto: "Cotizador" },
