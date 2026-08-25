@@ -131,6 +131,7 @@ def auditar_migracion(path: Path, rep: Reporte) -> None:
 
     # Una migracion ya aplicada no se edita: se escribe una nueva.
     manifiesto = ROOT / "database" / "migrations" / "CHECKSUMS.txt"
+    ya_aplicada = False
     if manifiesto.exists():
         registrados = {}
         for linea in manifiesto.read_text(encoding="utf-8").splitlines():
@@ -139,6 +140,7 @@ def auditar_migracion(path: Path, rep: Reporte) -> None:
                 registrados[archivo.strip()] = digest.strip()
         actual = checksum_normalizado(path)
         esperado = registrados.get(nombre)
+        ya_aplicada = esperado is not None
         if esperado and esperado != actual:
             rep.error(
                 "migracion-inmutable",
@@ -161,6 +163,30 @@ def auditar_migracion(path: Path, rep: Reporte) -> None:
                 "la tabla '" + tabla + "' habilita RLS pero no define ninguna politica",
                 rel,
             )
+
+    # Supabase concede ALL a anon y authenticated sobre las tablas nuevas de
+    # public. Una tabla que solo se apoya en deny_all queda a una politica mal
+    # escrita de estar abierta al rol anonimo. Paso exactamente eso con
+    # perfil_usuario en la migracion 024.
+    # Solo se exige a migraciones que aun no se han aplicado: una ya aplicada es
+    # inmutable por la regla de arriba, y su brecha se cierra con una migracion
+    # nueva (eso hace la 025), no editandola.
+    tablas_creadas = [] if ya_aplicada else re.findall(
+        r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)", sql, re.I)
+    if tablas_creadas:
+        for tabla in tablas_creadas:
+            revocada = re.search(
+                r"REVOKE\s+[^;]*\bON\b[^;]*\b" + tabla + r"\b[^;]*\bFROM\b[^;]*\banon\b",
+                sql, re.I | re.DOTALL,
+            )
+            if not revocada:
+                rep.error(
+                    "grant-por-defecto",
+                    "crea la tabla '" + tabla + "' sin revocar los privilegios que "
+                    "Supabase otorga por defecto a anon. Agrega "
+                    "'REVOKE ALL ON " + tabla + " FROM anon, authenticated;'",
+                    rel,
+                )
 
     # El deny_all de las tablas con PII no se toca (plan B1-d).
     for tabla in TABLAS_PII:
