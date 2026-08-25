@@ -7,6 +7,7 @@ import os
 import uuid
 from datetime import datetime, date
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 IMPORT_NAMESPACE = uuid.UUID("2e639048-61b2-5a2f-bcc2-13b78b7c8f5d")
 
@@ -76,8 +77,20 @@ def parse_text_array(v):
     return v
 
 
+def validate_database_role(db_url: str) -> str:
+    """Rechaza roles cliente que no pueden atravesar las politicas deny-all."""
+    username = unquote(urlparse(db_url).username or "").lower()
+    allowed = username == "service_role" or username == "postgres" or username.startswith("postgres.")
+    if not allowed:
+        raise RuntimeError(
+            "DATABASE_URL debe usar un rol de backend (postgres, postgres.<project> "
+            "o service_role); los roles anon/authenticated no pueden escribir con RLS deny-all."
+        )
+    return username
+
+
 def load_env():
-    """Carga .env.staging si existe, luego variables de entorno del sistema."""
+    """Carga el entorno y valida que DATABASE_URL use un rol de backend."""
     env_file = Path(__file__).parent.parent.parent / ".env.staging"
     if env_file.exists():
         from dotenv import load_dotenv
@@ -89,6 +102,7 @@ def load_env():
             "DATABASE_URL no está configurado.\n"
             "Crea .env.staging con DATABASE_URL=postgresql://... o exporta la variable."
         )
+    validate_database_role(db_url)
     return db_url
 
 
@@ -173,21 +187,39 @@ def register_raw_rows(
     target_id_key: str,
     entity_kind: str,
     chunk_size: int = None,  # ignorado — COPY no necesita chunks
+    normalizer=None,
 ) -> int:
     """Registra filas en import_raw_row vía COPY FROM STDIN."""
     rows = []
     for offset, record in enumerate(records):
         source_row_number = record.get("__sheet_row_number", offset + 2)
         row_number = start_row_number + offset
+        raw_source = record.get("__raw_payload", record)
+        raw_payload = {
+            k: v for k, v in record.items()
+            if not str(k).startswith("__") and not str(k).startswith("_")
+        }
+        if raw_source is not record:
+            raw_payload = {
+                k: v for k, v in raw_source.items()
+                if not str(k).startswith("__") and not str(k).startswith("_")
+            }
         payload = clean_record(record)
+        payload = {k: v for k, v in payload.items() if not str(k).startswith("_")}
+        if normalizer:
+            payload = normalizer(payload)
+        raw_payload["_sheet"] = sheet_name
+        raw_payload["_sheet_row_number"] = source_row_number
         payload["_sheet"] = sheet_name
         payload["_sheet_row_number"] = source_row_number
         target_id = clean_value(record.get(target_id_key))
+        match_status = record.get("__match_status", "PENDING")
+        raw_json = json.dumps(raw_payload, default=str, ensure_ascii=False)
         payload_json = json.dumps(payload, default=str, ensure_ascii=False)
         rows.append((
             batch_id, row_number,
-            payload_json, payload_json,
-            entity_kind, "IMPORTED",
+            raw_json, payload_json,
+            entity_kind, match_status,
             target_table, target_id,
         ))
     return copy_into(
@@ -209,27 +241,38 @@ def register_review_items(
 ) -> int:
     inserted = 0
     for record in records:
-        if clean_value(record.get("estado")) != "REVIEW_REQUIRED" and clean_value(record.get("estado_calidad")) != "NEEDS_REVIEW":
+        estado = clean_value(record.get("estado"))
+        estado_calidad = clean_value(record.get("estado_calidad"))
+        match_status = clean_value(record.get("__match_status"))
+        if (
+            estado not in ("REVIEW_REQUIRED", "INVALID")
+            and estado_calidad != "NEEDS_REVIEW"
+            and match_status not in ("POSSIBLE_MATCH", "POSSIBLE_DUPLICATE")
+        ):
             continue
 
         target_id = clean_value(record.get(target_id_key))
         reason = clean_value(record.get(review_reason_key)) if review_reason_key else None
         if not reason:
-            reason = f"{table_name} marcado para revision en archivo de migracion"
+            if match_status in ("POSSIBLE_MATCH", "POSSIBLE_DUPLICATE"):
+                reason = f"{table_name} requiere resolver coincidencia: {match_status}"
+            else:
+                reason = f"{table_name} marcado para revision en archivo de migracion"
 
+        severity = "HIGH" if estado == "INVALID" or match_status == "POSSIBLE_DUPLICATE" else "MEDIUM"
         cur.execute(
             """
             INSERT INTO import_review_item (
                 id_import_raw_row, review_reason, severity, resolution_status
             )
-            SELECT irr.id_import_raw_row, %s, 'MEDIUM', 'OPEN'
+            SELECT irr.id_import_raw_row, %s, %s, 'OPEN'
             FROM import_raw_row irr
             WHERE irr.id_import_batch = %s
               AND irr.target_table = %s
               AND irr.target_id = %s
             ON CONFLICT DO NOTHING
             """,
-            (reason, batch_id, table_name, target_id),
+            (reason, severity, batch_id, table_name, target_id),
         )
         inserted += cur.rowcount
     return inserted

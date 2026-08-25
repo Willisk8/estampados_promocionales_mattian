@@ -77,6 +77,32 @@ INSERT INTO contactabilidad (
     'Public registry import: do not assume campaign permission'
 );
 
+-- Agregar historial cerrado no debe multiplicar el canal en la vista operativa.
+INSERT INTO contactabilidad (
+    id_contactabilidad, id_canal_contacto, base_contacto_codigo,
+    evidencia, valido_desde, valido_hasta
+) VALUES (
+    '00000000-0000-4000-b000-000000000006',
+    '00000000-0000-4000-b000-000000000004',
+    'CONSENTIMIENTO',
+    'Fixture historico cerrado',
+    now() - interval '2 days',
+    now() - interval '1 day'
+);
+
+DO $$
+DECLARE
+    v_count INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO v_count
+    FROM vw_campaign_eligibility_queue
+    WHERE id_canal_contacto = '00000000-0000-4000-b000-000000000004';
+    ASSERT v_count = 1,
+        'campaign eligibility debe devolver una fila por canal, obtuvo: ' || v_count;
+    RAISE NOTICE 'PASSED - campaign eligibility no duplica historial';
+END;
+$$;
+
 DO $$
 DECLARE
     r RECORD;

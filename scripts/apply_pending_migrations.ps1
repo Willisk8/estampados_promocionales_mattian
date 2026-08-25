@@ -18,6 +18,18 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     filename TEXT PRIMARY KEY,
     applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY;
+DO `$`$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = current_schema()
+          AND tablename = 'schema_migrations'
+          AND policyname = 'deny_all'
+    ) THEN
+        CREATE POLICY deny_all ON schema_migrations
+            AS RESTRICTIVE FOR ALL USING (false);
+    END IF;
+END `$`$;
 "@
 
 $migrations = Get-ChildItem -LiteralPath $MigrationsDir -Filter "*.sql" |

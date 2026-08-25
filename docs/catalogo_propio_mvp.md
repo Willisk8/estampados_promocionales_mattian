@@ -133,7 +133,9 @@ No cargar 935 productos al catalogo propio. Para cerrar el MVP comercial, selecc
 
 Para cada producto se debe definir:
 
-- SKU propio;
+- SKU propio legible con formato `PRD-{FAMILIA}-{REFERENCIA}` (por ejemplo,
+  `PRD-MUG-11OZ`); las variantes extienden ese SKU con atributos estables como
+  tecnica o color (`PRD-MUG-11OZ-BLANCO`);
 - variante propia;
 - producto proveedor elegido;
 - costo proveedor vigente;
@@ -159,3 +161,11 @@ FROM resolve_price(
 ```
 
 Debe devolver un unico precio `OK`, con escala, moneda y vigencia correctas.
+
+## Limite operativo de compra optima DTF
+
+`least_cost_sheet_purchase()` usa programacion dinamica lineal respecto al largo
+requerido. El calculo exacto admite hasta `100.000 cm` (1 km) por cotizacion y
+falla explicitamente por encima de ese umbral. Los pedidos normales de cientos
+de prendas, alrededor de varios miles de centimetros, quedan holgadamente dentro
+del limite.

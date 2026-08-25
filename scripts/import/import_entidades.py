@@ -14,9 +14,11 @@ Uso:
 """
 
 import argparse
+from collections import Counter
 import hashlib
 import hmac
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -61,6 +63,96 @@ def read_sheet(wb, sheet_name: str, limit: int | None = None) -> tuple[list[str]
 
 def compute_email_hash(email: str, secret: str) -> str:
     return hmac.new(secret.encode(), email.lower().strip().encode(), hashlib.sha256).hexdigest()
+
+
+EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+
+def is_valid_email(value: str | None) -> bool:
+    return bool(value and EMAIL_RE.fullmatch(value.strip()))
+
+
+def normalize_contact_record(record: dict) -> dict:
+    normalized = dict(record)
+    tipo = str(normalized.get("tipo") or "").upper()
+    value = clean_value(normalized.get("valor_normalizado") or normalized.get("valor_original"))
+    if tipo == "EMAIL" and value:
+        value = str(value).lower()
+    normalized["tipo"] = tipo
+    normalized["valor_normalizado"] = value
+    return normalized
+
+
+def prepare_contact_records(records: list[dict]) -> list[dict]:
+    """Normaliza canales y pone emails malformados en cuarentena."""
+    prepared = []
+    for source in records:
+        record = dict(source)
+        record["__raw_payload"] = dict(source)
+        normalized = normalize_contact_record(record)
+        record["tipo"] = normalized["tipo"]
+        record["valor_normalizado"] = normalized["valor_normalizado"]
+        if record["tipo"] == "EMAIL" and not is_valid_email(record["valor_normalizado"]):
+            record["estado"] = "INVALID"
+            record["__review_reason"] = "Formato de email invalido; no activar ni usar en campanas"
+        prepared.append(record)
+    return prepared
+
+
+def assign_match_statuses(cur, table: str, id_key: str, records: list[dict]) -> None:
+    """Clasifica coincidencias por PK; para organizaciones agrega NIT y firma nominal."""
+    ids = [clean_value(r.get(id_key)) for r in records if clean_value(r.get(id_key))]
+    existing_ids = set()
+    if ids:
+        cur.execute(f"SELECT {id_key}::text FROM {table} WHERE {id_key} = ANY(%s::uuid[])", (ids,))
+        existing_ids = {str(row[0]) for row in cur.fetchall()}
+
+    existing_nits = set()
+    possible_orgs = set()
+    duplicate_nits = set()
+    if table == "organizacion":
+        nits = [str(clean_value(r.get("nit"))) for r in records if clean_value(r.get("nit"))]
+        duplicate_nits = {nit for nit, count in Counter(nits).items() if count > 1}
+        if nits:
+            cur.execute("SELECT nit FROM organizacion WHERE nit = ANY(%s)", (list(set(nits)),))
+            existing_nits = {str(row[0]) for row in cur.fetchall()}
+        signatures = {
+            (
+                str(clean_value(r.get("nombre_legal")) or "").casefold(),
+                str(clean_value(r.get("municipio")) or "").casefold(),
+                str(clean_value(r.get("tipo_entidad_origen")) or "").casefold(),
+            )
+            for r in records
+        }
+        cur.execute("SELECT nombre_legal, municipio, tipo_entidad_origen FROM organizacion")
+        existing_signatures = {
+            (str(a or "").casefold(), str(b or "").casefold(), str(c or "").casefold())
+            for a, b, c in cur.fetchall()
+        }
+        possible_orgs = signatures & existing_signatures
+
+    for record in records:
+        target_id = str(clean_value(record.get(id_key)) or "")
+        if target_id in existing_ids:
+            status = "MATCH_CONFIRMED"
+        elif table == "organizacion":
+            nit = str(clean_value(record.get("nit")) or "")
+            signature = (
+                str(clean_value(record.get("nombre_legal")) or "").casefold(),
+                str(clean_value(record.get("municipio")) or "").casefold(),
+                str(clean_value(record.get("tipo_entidad_origen")) or "").casefold(),
+            )
+            if nit in duplicate_nits:
+                status = "POSSIBLE_DUPLICATE"
+            elif nit in existing_nits:
+                status = "POSSIBLE_DUPLICATE"
+            elif signature in possible_orgs:
+                status = "POSSIBLE_MATCH"
+            else:
+                status = "NEW_RECORD"
+        else:
+            status = "NEW_RECORD"
+        record["__match_status"] = status
 
 
 # --------------------------------------------------------------------------- #
@@ -145,7 +237,10 @@ def insert_canal_contacto(cur, records: list[dict], hmac_secret: str | None) -> 
         email_hash = clean_value(r.get("email_hash"))
         tipo = clean_value(r.get("tipo"))
         valor_norm = clean_value(r.get("valor_normalizado"))
-        if tipo == "EMAIL" and valor_norm and not email_hash and hmac_secret:
+        estado = clean_value(r.get("estado", "ACTIVE"))
+        if tipo == "EMAIL" and estado == "INVALID":
+            email_hash = None
+        elif tipo == "EMAIL" and valor_norm and not email_hash and hmac_secret:
             email_hash = compute_email_hash(valor_norm, hmac_secret)
         rows.append((
             clean_value(r["id_canal_contacto"]),
@@ -157,7 +252,7 @@ def insert_canal_contacto(cur, records: list[dict], hmac_secret: str | None) -> 
             email_hash,
             clean_value(r["fuente"]),
             clean_value(r.get("confianza", "UNKNOWN")),
-            clean_value(r.get("estado", "ACTIVE")),
+            estado,
         ))
     return copy_into(
         cur, "canal_contacto",
@@ -214,6 +309,8 @@ def run(file_path: str, limit: int | None, dry_run: bool):
         personas_filtered = personas
         canales_filtered = canales
 
+    canales_filtered = prepare_contact_records(canales_filtered)
+
     wb.close()
 
     total_rows = len(orgs) + len(personas_filtered) + len(pers_org_filtered) + len(canales_filtered)
@@ -249,6 +346,31 @@ def run(file_path: str, limit: int | None, dry_run: bool):
 
         try:
             with conn.cursor() as cur:
+                assign_match_statuses(cur, "organizacion", "id_organizacion", orgs)
+                assign_match_statuses(cur, "persona", "id_persona", personas_filtered)
+                assign_match_statuses(cur, "persona_organizacion", "id_persona_organizacion", pers_org_filtered)
+                assign_match_statuses(cur, "canal_contacto", "id_canal_contacto", canales_filtered)
+
+                accepted_org_ids = {
+                    clean_value(r["id_organizacion"])
+                    for r in orgs
+                    if r["__match_status"] in ("NEW_RECORD", "MATCH_CONFIRMED")
+                }
+                orgs_to_load = [r for r in orgs if clean_value(r["id_organizacion"]) in accepted_org_ids]
+                pers_orgs_to_load = [
+                    r for r in pers_org_filtered
+                    if clean_value(r["id_organizacion"]) in accepted_org_ids
+                ]
+                accepted_person_ids = {clean_value(r["id_persona"]) for r in pers_orgs_to_load}
+                personas_to_load = [
+                    r for r in personas_filtered
+                    if clean_value(r["id_persona"]) in accepted_person_ids
+                ]
+                canales_to_load = [
+                    r for r in canales_filtered
+                    if clean_value(r.get("id_organizacion")) in accepted_org_ids
+                    or clean_value(r.get("id_persona")) in accepted_person_ids
+                ]
                 print("\nRegistrando trazabilidad import_raw_row...")
                 row_cursor = 1
                 n = register_raw_rows(
@@ -269,28 +391,29 @@ def run(file_path: str, limit: int | None, dry_run: bool):
                 n += register_raw_rows(
                     cur, batch_id, "canal_contacto", canales_filtered, row_cursor,
                     "canal_contacto", "id_canal_contacto", "OTHER",
+                    normalizer=normalize_contact_record,
                 )
                 print(f"  {n:,} filas raw registradas")
 
                 print("\nInsertando organizacion...")
-                n = insert_organizacion(cur, orgs)
-                print(f"  {n:,} nuevas / {len(orgs) - n:,} ya existían")
+                n = insert_organizacion(cur, orgs_to_load)
+                print(f"  {n:,} nuevas / {len(orgs) - n:,} existentes o enviadas a revision")
 
                 print("Insertando persona...")
-                n = insert_persona(cur, personas_filtered)
-                print(f"  {n:,} nuevas / {len(personas_filtered) - n:,} ya existían")
+                n = insert_persona(cur, personas_to_load)
+                print(f"  {n:,} nuevas / {len(personas_filtered) - n:,} existentes o dependencias retenidas")
 
                 print("Insertando persona_organizacion...")
-                n = insert_persona_organizacion(cur, pers_org_filtered)
-                print(f"  {n:,} nuevas / {len(pers_org_filtered) - n:,} ya existían")
+                n = insert_persona_organizacion(cur, pers_orgs_to_load)
+                print(f"  {n:,} nuevas / {len(pers_org_filtered) - n:,} existentes o dependencias retenidas")
 
                 print("Insertando canal_contacto...")
-                n = insert_canal_contacto(cur, canales_filtered, hmac_secret)
-                print(f"  {n:,} nuevas / {len(canales_filtered) - n:,} ya existían")
+                n = insert_canal_contacto(cur, canales_to_load, hmac_secret)
+                print(f"  {n:,} nuevas / {len(canales_filtered) - n:,} existentes o dependencias retenidas")
 
                 print("Insertando contactabilidad DESCONOCIDA...")
-                n = insert_contactabilidad_desconocida(cur, canales_filtered, source_name)
-                print(f"  {n:,} nuevas / {len(canales_filtered) - n:,} ya existían")
+                n = insert_contactabilidad_desconocida(cur, canales_to_load, source_name)
+                print(f"  {n:,} nuevas / {len(canales_filtered) - n:,} existentes o dependencias retenidas")
 
                 print("Registrando elementos para revision...")
                 n = register_review_items(cur, batch_id, "organizacion", "id_organizacion", orgs)
@@ -301,6 +424,14 @@ def run(file_path: str, limit: int | None, dry_run: bool):
                     "persona_organizacion",
                     "id_persona_organizacion",
                     pers_org_filtered,
+                )
+                n += register_review_items(
+                    cur,
+                    batch_id,
+                    "canal_contacto",
+                    "id_canal_contacto",
+                    canales_filtered,
+                    "__review_reason",
                 )
                 print(f"  {n:,} elementos de revision abiertos")
 

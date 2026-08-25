@@ -14,6 +14,7 @@ from pricing_model import (  # noqa: E402
     money,
     tiered_unit_cost,
 )
+from generate_catalog_seed import classify_costs  # noqa: E402
 
 
 class PricingModelTests(unittest.TestCase):
@@ -31,6 +32,32 @@ class PricingModelTests(unittest.TestCase):
         self.assertEqual(tiered_unit_cost(item, 12), 129000 / 36)
         self.assertEqual(tiered_unit_cost(item, 36), 120000 / 36)
 
+    def test_catalog_cost_snapshot_uses_tiers_and_excludes_separate_shipping(self):
+        config = {
+            "product_costs": [{"name": "Mug proveedor", "tiers": [
+                {"from_qty": 1, "value_unit": 6200},
+                {"from_qty": 12, "pack_qty": 36, "pack_price": 129000},
+            ]}],
+            "order_costs": [
+                {"name": "alistamiento", "value_total": 12000},
+                {"name": "envio", "value_total": 24000, "billing": "separate"},
+            ],
+        }
+        costs = classify_costs(config, 12)
+        self.assertEqual(costs["base"], 129000 / 36)
+        self.assertEqual(costs["other"], 1000)
+
+    def test_machine_wear_respects_minimum_amortization_quantity(self):
+        config = {
+            "product_costs": [{"name": "producto", "value_unit": 1000}],
+            "machines": [{"replacement_value": 120000, "estimated_uses": 1000}],
+            "machine_wear_policy": {"min_amortization_qty": 12},
+            "commercial_policy": {"mode": "markup", "target_pct": 0},
+        }
+        one = calculate_price(config, 1)
+        twelve = calculate_price(config, 12)
+        self.assertEqual(one.total_cost_unit, twelve.total_cost_unit)
+
     def test_least_cost_sheet_purchase_combines_supplier_formats(self):
         options = [
             {"width_cm": 58, "height_cm": 30, "price": 8000},
@@ -42,6 +69,9 @@ class PricingModelTests(unittest.TestCase):
         self.assertEqual(least_cost_sheet_purchase(33, options), 13000)
         self.assertEqual(least_cost_sheet_purchase(99, options), 26000)
         self.assertEqual(least_cost_sheet_purchase(825, options), 216000)
+
+        with self.assertRaises(ValueError):
+            least_cost_sheet_purchase(100001, options)
 
     def test_dtf_chest_and_back_uses_supplier_purchase_options(self):
         config = {

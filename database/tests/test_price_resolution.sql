@@ -291,6 +291,32 @@ END;
 $$;
 
 -- ===========================================================
+-- CASO G — Variante inactiva no es cotizable ni cae a precio generico
+-- ===========================================================
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    UPDATE variante_producto
+    SET estado = 'INACTIVE'
+    WHERE id_variante = '00000000-0000-4000-a000-000000000002';
+
+    SELECT * INTO r FROM resolve_price(
+        '00000000-0000-4000-a000-000000000001'::UUID,
+        '00000000-0000-4000-a000-000000000002'::UUID,
+        50,
+        '2025-06-15 12:00:00+00'::TIMESTAMPTZ,
+        'COP'
+    );
+    ASSERT r.status = 'PRICE_NOT_FOUND',
+        'CASO G: variante inactiva debe devolver PRICE_NOT_FOUND, obtenido: ' || COALESCE(r.status,'NULL');
+    ASSERT r.nivel = 'VARIANTE',
+        'CASO G: nivel esperado VARIANTE, obtenido: ' || COALESCE(r.nivel,'NULL');
+    RAISE NOTICE 'CASO G PASSED — Variante inactiva no es cotizable';
+END;
+$$;
+
+-- ===========================================================
 -- TEARDOWN — Revertir todo (no contaminar staging)
 -- ===========================================================
 ROLLBACK;

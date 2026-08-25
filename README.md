@@ -9,7 +9,7 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 | Componente | Estado | Detalle |
 |---|---|---|
 | Infraestructura Supabase STAGING | ✓ Completo | Proyecto `psereyjwjpyakkmnabgm`, región us-west-2 Oregon |
-| Migraciones `000`–`017` | ✓ Aplicadas/pendientes CI | 18 migraciones numeradas; deploy idempotente vía `schema_migrations` |
+| Migraciones `000`–`018` | ✓ Aplicadas/pendientes CI | 19 migraciones numeradas; deploy idempotente vía `schema_migrations` |
 | Motor de precios (`resolve_price`) | ✓ Operativo | Tests A–F pasando |
 | CRM — organizaciones y personas | ✓ Cargado | 5,639 organizaciones · 4,642 personas |
 | CRM — canales de contacto | ✓ Cargado | 16,211 canales (email, teléfono, WhatsApp, web) |
@@ -147,6 +147,7 @@ No usar scripts no idempotentes para migraciones. El único flujo manual soporta
 | `015_email_quality_classification.sql` | Clasificación fina de emails para segmentación pre-piloto |
 | `016_fix_security_invoker_views.sql` | Corrige vistas detectadas como SECURITY DEFINER por linter Supabase |
 | `017_supplier_price_purchase_terms.sql` | Agrega condiciones de compra proveedor para costos variables |
+| `018_audit_hardening.sql` | Bloquea variantes inactivas y deduplica historial en elegibilidad CRM |
 
 ### Convenciones obligatorias
 
@@ -391,9 +392,18 @@ python scripts/analytics/data_quality_probe.py > docs/data_quality_raw.json
 | Backup del `HMAC_SUPPRESSION_SECRET` | Debe guardarse en gestor seguro; si se pierde, no se pueden recalcular hashes compatibles |
 | `N8N_ENCRYPTION_KEY` fuera de Git | Cuando se configure n8n |
 | `.env.staging` excluida de Git | Verificar con `git status` antes de cada commit |
-| Datos PII fuera de Git | `scraping/data/raw/`, `scraping/data/processed/`, `scraping/data/web/`, `scraping/outputs/`, `outputs/` |
+| Datos PII fuera de Git | `scraping/**/outputs/`, `scraping/data/raw/`, `scraping/data/processed/`, `scraping/data/web/`, `outputs/` |
 | Retención de `import_raw_row` | Propuesta: purgar/anonimizar payloads crudos con PII después de 90 días |
 | Todo trabajo en STAGING | Ninguna escritura a producción hasta que STAGING esté curado |
+
+### Estado de despliegue de migraciones
+
+Hasta el corte del 2026-08-25, las migraciones se han aplicado manualmente con
+`psql` o `scripts/apply_pending_migrations.ps1`. El workflow
+`.github/workflows/deploy-staging.yml` queda preparado para el primer push de
+migraciones a `staging` o para ejecución manual (`workflow_dispatch`). Las ramas
+locales `master` y `staging` aún comparten commit por decisión explícita; esto no
+equivale a un despliegue de producción.
 
 ---
 

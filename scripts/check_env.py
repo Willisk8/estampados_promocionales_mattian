@@ -19,6 +19,8 @@ WARN_IF_PROD_VALUE = [
     "DATABASE_URL",
 ]
 
+PRODUCTION_MARKERS = ("prod", "production", "produccion", "producción")
+
 def check_env():
     errors = []
     warnings = []
@@ -37,7 +39,7 @@ def check_env():
     if env == "staging":
         for var in WARN_IF_PROD_VALUE:
             val = os.environ.get(var, "")
-            if "prod" in val.lower():
+            if any(marker in val.lower() for marker in PRODUCTION_MARKERS):
                 warnings.append(f"POSIBLE CREDENCIAL DE PRODUCCION en STAGING: {var}")
 
     if errors:

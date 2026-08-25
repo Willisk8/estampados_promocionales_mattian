@@ -17,6 +17,9 @@ from pathlib import Path
 from typing import Any
 
 
+MAX_SHEET_DP_HEIGHT_CM = 100_000
+
+
 def money(value: float) -> int:
     return round(value)
 
@@ -83,6 +86,11 @@ def least_cost_sheet_purchase(required_height_cm: float, options: list[dict[str,
         return 0.0
 
     target = int(round(required_height_cm + 0.499999))
+    if target > MAX_SHEET_DP_HEIGHT_CM:
+        raise ValueError(
+            f"required_height_cm={target} supera el limite operativo de "
+            f"{MAX_SHEET_DP_HEIGHT_CM} cm para la optimizacion exacta"
+        )
     max_height = max(height for height, _ in normalized)
     limit = target + max_height
     inf = float("inf")
