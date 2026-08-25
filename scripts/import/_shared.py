@@ -259,7 +259,9 @@ def register_review_items(
             else:
                 reason = f"{table_name} marcado para revision en archivo de migracion"
 
-        severity = "HIGH" if estado == "INVALID" or match_status == "POSSIBLE_DUPLICATE" else "MEDIUM"
+        severity = clean_value(record.get("__review_severity"))
+        if not severity:
+            severity = "HIGH" if estado == "INVALID" or match_status == "POSSIBLE_DUPLICATE" else "MEDIUM"
         cur.execute(
             """
             INSERT INTO import_review_item (

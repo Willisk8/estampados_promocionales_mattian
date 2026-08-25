@@ -69,12 +69,14 @@ END;
 $$;
 
 INSERT INTO contactabilidad (
-    id_contactabilidad, id_canal_contacto, base_contacto_codigo, evidencia
+    id_contactabilidad, id_canal_contacto, base_contacto_codigo, evidencia,
+    valido_desde
 ) VALUES (
     '00000000-0000-4000-b000-000000000005',
     '00000000-0000-4000-b000-000000000004',
     'DESCONOCIDA',
-    'Public registry import: do not assume campaign permission'
+    'Public registry import: do not assume campaign permission',
+    now() - interval '10 minutes'
 );
 
 -- Agregar historial cerrado no debe multiplicar el canal en la vista operativa.
@@ -112,6 +114,95 @@ BEGIN
     ASSERT r.reason = 'CONTACTABILITY_NOT_CONFIRMED',
         'expected CONTACTABILITY_NOT_CONFIRMED, got ' || COALESCE(r.reason, 'NULL');
     RAISE NOTICE 'PASSED - unknown contactability is not campaign eligible';
+END;
+$$;
+
+-- Un consentimiento futuro no debe ser efectivo ni aparecer como base vigente.
+INSERT INTO contactabilidad (
+    id_contactabilidad, id_canal_contacto, base_contacto_codigo,
+    evidencia, valido_desde, valido_hasta
+) VALUES (
+    '00000000-0000-4000-b000-000000000007',
+    '00000000-0000-4000-b000-000000000004',
+    'CONSENTIMIENTO_EXPRESO',
+    'Fixture consentimiento futuro',
+    now() + interval '1 day',
+    NULL
+);
+
+DO $$
+DECLARE
+    r RECORD;
+    v_base TEXT;
+BEGIN
+    SELECT * INTO r FROM fn_email_eligible_for_campaign('hash-fixture-contacto-testcrm');
+    ASSERT r.eligible = false, 'future consent should not be eligible';
+    ASSERT r.reason = 'CONTACTABILITY_NOT_CONFIRMED',
+        'expected CONTACTABILITY_NOT_CONFIRMED for future consent, got ' || COALESCE(r.reason, 'NULL');
+
+    SELECT base_contacto_codigo INTO v_base
+    FROM vw_campaign_eligibility_queue
+    WHERE id_canal_contacto = '00000000-0000-4000-b000-000000000004';
+    ASSERT v_base = 'DESCONOCIDA',
+        'future consent should not be shown as current contactability, got ' || COALESCE(v_base, 'NULL');
+    RAISE NOTICE 'PASSED - future contactability is not effective';
+END;
+$$;
+
+-- La fila efectiva mas reciente debe gobernar la vista y la elegibilidad.
+-- Un NO_CONTACTAR vigente debe vencer un consentimiento previo que siga abierto.
+INSERT INTO contactabilidad (
+    id_contactabilidad, id_canal_contacto, base_contacto_codigo,
+    evidencia, valido_desde, valido_hasta
+) VALUES (
+    '00000000-0000-4000-b000-000000000008',
+    '00000000-0000-4000-b000-000000000004',
+    'CONSENTIMIENTO_EXPRESO',
+    'Fixture consentimiento efectivo previo',
+    now() - interval '2 minutes',
+    NULL
+);
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    SELECT * INTO r FROM fn_email_eligible_for_campaign('hash-fixture-contacto-testcrm');
+    ASSERT r.eligible = true, 'effective consent should be eligible before NO_CONTACTAR';
+    ASSERT r.reason = 'ELIGIBLE',
+        'expected ELIGIBLE before NO_CONTACTAR, got ' || COALESCE(r.reason, 'NULL');
+    RAISE NOTICE 'PASSED - effective consent is eligible before opt-out';
+END;
+$$;
+
+INSERT INTO contactabilidad (
+    id_contactabilidad, id_canal_contacto, base_contacto_codigo,
+    evidencia, valido_desde, valido_hasta
+) VALUES (
+    '00000000-0000-4000-b000-000000000009',
+    '00000000-0000-4000-b000-000000000004',
+    'NO_CONTACTAR',
+    'Fixture no contactar vigente',
+    now(),
+    NULL
+);
+
+DO $$
+DECLARE
+    r RECORD;
+    v_base TEXT;
+BEGIN
+    SELECT * INTO r FROM fn_email_eligible_for_campaign('hash-fixture-contacto-testcrm');
+    ASSERT r.eligible = false, 'NO_CONTACTAR should win over older open consent';
+    ASSERT r.reason = 'CONTACTABILITY_NOT_CONFIRMED',
+        'expected CONTACTABILITY_NOT_CONFIRMED after NO_CONTACTAR, got ' || COALESCE(r.reason, 'NULL');
+
+    SELECT base_contacto_codigo INTO v_base
+    FROM vw_campaign_eligibility_queue
+    WHERE id_canal_contacto = '00000000-0000-4000-b000-000000000004';
+    ASSERT v_base = 'NO_CONTACTAR',
+        'view should show latest effective NO_CONTACTAR, got ' || COALESCE(v_base, 'NULL');
+    RAISE NOTICE 'PASSED - NO_CONTACTAR wins over older open consent';
 END;
 $$;
 

@@ -112,6 +112,74 @@ $$;
 REVOKE ALL ON FUNCTION resolve_price(UUID, UUID, INT, TIMESTAMPTZ, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION resolve_price(UUID, UUID, INT, TIMESTAMPTZ, TEXT) FROM anon, authenticated;
 
+CREATE OR REPLACE FUNCTION fn_email_eligible_for_campaign(
+    p_email_hash TEXT
+)
+RETURNS TABLE (
+    eligible BOOLEAN,
+    reason   TEXT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_has_suppression BOOLEAN;
+    v_has_allowed_effective_contactability BOOLEAN;
+BEGIN
+    IF p_email_hash IS NULL OR btrim(p_email_hash) = '' THEN
+        RETURN QUERY SELECT false, 'EMAIL_HASH_REQUIRED';
+        RETURN;
+    END IF;
+
+    SELECT EXISTS (
+        SELECT 1
+        FROM supresion s
+        WHERE s.tipo = 'EMAIL'
+          AND s.valor_hash = p_email_hash
+    ) INTO v_has_suppression;
+
+    IF v_has_suppression THEN
+        RETURN QUERY SELECT false, 'SUPPRESSED';
+        RETURN;
+    END IF;
+
+    WITH contactabilidad_efectiva AS (
+        SELECT DISTINCT ON (cc.id_canal_contacto)
+            cc.id_canal_contacto,
+            c.base_contacto_codigo
+        FROM canal_contacto cc
+        JOIN contactabilidad c
+          ON c.id_canal_contacto = cc.id_canal_contacto
+        WHERE cc.tipo = 'EMAIL'
+          AND cc.email_hash = p_email_hash
+          AND cc.estado = 'ACTIVE'
+          AND c.valido_desde <= now()
+          AND (c.valido_hasta IS NULL OR c.valido_hasta > now())
+        ORDER BY cc.id_canal_contacto, c.valido_desde DESC, c.created_at DESC
+    )
+    SELECT EXISTS (
+        SELECT 1
+        FROM contactabilidad_efectiva ce
+        WHERE ce.base_contacto_codigo IN (
+            'CONSENTIMIENTO_EXPRESO',
+            'RELACION_COMERCIAL_PREVIA',
+            'SOLICITUD_DEL_TITULAR'
+        )
+    ) INTO v_has_allowed_effective_contactability;
+
+    IF v_has_allowed_effective_contactability THEN
+        RETURN QUERY SELECT true, 'ELIGIBLE';
+        RETURN;
+    END IF;
+
+    RETURN QUERY SELECT false, 'CONTACTABILITY_NOT_CONFIRMED';
+END;
+$$;
+
+REVOKE ALL ON FUNCTION fn_email_eligible_for_campaign(TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION fn_email_eligible_for_campaign(TEXT) FROM anon, authenticated;
+
 CREATE OR REPLACE VIEW vw_campaign_eligibility_queue
 WITH (security_invoker = on) AS
 WITH contactabilidad_actual AS (
@@ -120,7 +188,8 @@ WITH contactabilidad_actual AS (
         base_contacto_codigo,
         evidencia
     FROM contactabilidad
-    WHERE valido_hasta IS NULL OR valido_hasta > now()
+    WHERE valido_desde <= now()
+      AND (valido_hasta IS NULL OR valido_hasta > now())
     ORDER BY id_canal_contacto, valido_desde DESC, created_at DESC
 )
 SELECT

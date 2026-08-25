@@ -66,10 +66,26 @@ def compute_email_hash(email: str, secret: str) -> str:
 
 
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+MALFORMED_EMAIL_DOMAINS = frozenset({
+    # Debe mantenerse alineado con database/migrations/014_quarantine_malformed_email_domains.sql.
+    "coomservi.combogot",
+    "colegiocoomeva.edu.codocente",
+    "fbcsena.comauxiliar",
+})
 
 
 def is_valid_email(value: str | None) -> bool:
     return bool(value and EMAIL_RE.fullmatch(value.strip()))
+
+
+def email_domain(value: str | None) -> str:
+    if not value or "@" not in value:
+        return ""
+    return value.rsplit("@", 1)[1].strip().lower()
+
+
+def is_malformed_email_domain(value: str | None) -> bool:
+    return email_domain(value) in MALFORMED_EMAIL_DOMAINS
 
 
 def normalize_contact_record(record: dict) -> dict:
@@ -95,6 +111,13 @@ def prepare_contact_records(records: list[dict]) -> list[dict]:
         if record["tipo"] == "EMAIL" and not is_valid_email(record["valor_normalizado"]):
             record["estado"] = "INVALID"
             record["__review_reason"] = "Formato de email invalido; no activar ni usar en campanas"
+        elif record["tipo"] == "EMAIL" and is_malformed_email_domain(record["valor_normalizado"]):
+            domain = email_domain(record["valor_normalizado"])
+            record["estado"] = "REVIEW_REQUIRED"
+            record["__review_severity"] = "HIGH"
+            record["__review_reason"] = (
+                "email dominio malformado por posible concatenacion: " + domain
+            )
         prepared.append(record)
     return prepared
 

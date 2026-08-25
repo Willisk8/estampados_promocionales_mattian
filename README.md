@@ -20,7 +20,7 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 | Calidad de datos | ✓ Score 87/100 | Reporte en `docs/data_quality_report.md` |
 | Gates pre-piloto | ⚠ Pendiente | Ver `docs/pre_pilot_gates.md` |
 | CI/CD a STAGING | ✓ Activo | GitHub Actions — rama `staging` |
-| Rama principal | ✓ Actualizada | `master` y `staging` apuntan al mismo commit; separación PROD aún no existe |
+| Rama principal | ⚠ Gobernanza MVP | `staging` es la rama desplegable a STAGING; `master` puede adelantarse mientras haya cambios pendientes de promover |
 | Supabase PROD | — No iniciado | Plan explícito en `docs/staging_prod_separation_plan.md` |
 
 ---
@@ -400,10 +400,11 @@ python scripts/analytics/data_quality_probe.py > docs/data_quality_raw.json
 
 Hasta el corte del 2026-08-25, las migraciones se han aplicado manualmente con
 `psql` o `scripts/apply_pending_migrations.ps1`. El workflow
-`.github/workflows/deploy-staging.yml` queda preparado para el primer push de
-migraciones a `staging` o para ejecución manual (`workflow_dispatch`). Las ramas
-locales `master` y `staging` aún comparten commit por decisión explícita; esto no
-equivale a un despliegue de producción.
+`.github/workflows/deploy-staging.yml` despliega únicamente desde `staging` o por
+ejecución manual (`workflow_dispatch`). Si `master` está por delante de
+`staging`, esos cambios deben tratarse como pendientes de integración/despliegue
+en STAGING. En ningún caso la sincronía entre ramas equivale a un despliegue de
+producción.
 
 ---
 
