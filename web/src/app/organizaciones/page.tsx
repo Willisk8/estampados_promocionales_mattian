@@ -9,6 +9,19 @@ const POR_PAGINA = 50;
 /** Un reporte oficial viejo puede describir una entidad que ya no existe. */
 const ANIOS_PARA_ALERTA = 4;
 
+/** Catalogo cerrado por CHECK constraint en cat_tipo_organizacion. */
+const TIPOS_ORGANIZACION = [
+  ["FONDO_EMPLEADOS", "Fondo de empleados"],
+  ["COOPERATIVA", "Cooperativa"],
+  ["MUTUAL", "Mutual"],
+  ["EMPRESA", "Empresa"],
+  ["CONJUNTO_RESIDENCIAL", "Conjunto residencial"],
+  ["OTRO", "Otro"],
+] as const;
+
+/** Catalogo cerrado por CHECK constraint en relacion_comercial_organizacion. */
+const ESTADOS_COMERCIALES = ["PROSPECTO", "CLIENTE", "DESCARTADO", "INACTIVO"] as const;
+
 type Fila = {
   id_organizacion: string;
   nit: string | null;
@@ -63,6 +76,8 @@ export default async function PaginaOrganizaciones({
     depto?: string;
     ciudad?: string;
     email?: string;
+    tipo?: string;
+    comercial?: string;
     p?: string;
   }>;
 }) {
@@ -81,6 +96,8 @@ export default async function PaginaOrganizaciones({
       p_solo_con_email: sp.email === "1" ? true : null,
       p_limite: POR_PAGINA,
       p_desplazamiento: (pagina - 1) * POR_PAGINA,
+      p_tipo_codigo: sp.tipo?.trim() || null,
+      p_estado_comercial: sp.comercial?.trim() || null,
     }),
     supabase.rpc("fn_consola_ubicaciones", { p_departamento: null }),
   ]);
@@ -117,6 +134,8 @@ export default async function PaginaOrganizaciones({
     if (sp.depto) q.set("depto", sp.depto);
     if (sp.ciudad) q.set("ciudad", sp.ciudad);
     if (sp.email === "1") q.set("email", "1");
+    if (sp.tipo) q.set("tipo", sp.tipo);
+    if (sp.comercial) q.set("comercial", sp.comercial);
     q.set("p", String(p));
     return `/organizaciones?${q}`;
   };
@@ -147,12 +166,28 @@ export default async function PaginaOrganizaciones({
             </option>
           ))}
         </select>
+        <select name="tipo" defaultValue={sp.tipo ?? ""}>
+          <option value="">Todo tipo</option>
+          {TIPOS_ORGANIZACION.map(([codigo, etiqueta]) => (
+            <option key={codigo} value={codigo}>
+              {etiqueta}
+            </option>
+          ))}
+        </select>
+        <select name="comercial" defaultValue={sp.comercial ?? ""}>
+          <option value="">Todo estado comercial</option>
+          {ESTADOS_COMERCIALES.map((e) => (
+            <option key={e} value={e}>
+              {e}
+            </option>
+          ))}
+        </select>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14 }}>
           <input type="checkbox" name="email" value="1" defaultChecked={sp.email === "1"} />
           Solo con correo activo
         </label>
         <button type="submit">Filtrar</button>
-        {(sp.q || sp.depto || sp.ciudad || sp.email) && (
+        {(sp.q || sp.depto || sp.ciudad || sp.email || sp.tipo || sp.comercial) && (
           <Link href="/organizaciones" className="nav-enlace">
             Limpiar
           </Link>
