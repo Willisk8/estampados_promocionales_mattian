@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
 import { SinAcceso } from "@/componentes/sin-acceso";
+import { rangoLegible, ordenRango } from "@/lib/rangos";
 
 export const dynamic = "force-dynamic";
 
@@ -34,21 +35,8 @@ type Producto = {
 
 const cop = (v: number) => "$" + v.toLocaleString("es-CO", { maximumFractionDigits: 0 });
 
-/** `[12,36)` de un int4range se lee mejor como "12 – 35". */
-export function rangoLegible(rango: string): string {
-  const m = rango.match(/^([\[(])(\d*),(\d*)([\])])$/);
-  if (!m) return rango;
-  const [, abre, desde, hasta, cierra] = m;
-  const min = desde ? Number(desde) + (abre === "(" ? 1 : 0) : 1;
-  if (!hasta) return `${min} o mas`;
-  const max = Number(hasta) - (cierra === ")" ? 1 : 0);
-  return min === max ? String(min) : `${min} – ${max}`;
-}
-
-function ordenRango(rango: string): number {
-  const m = rango.match(/^[\[(](\d*),/);
-  return m && m[1] ? Number(m[1]) : 0;
-}
+// rangoLegible y ordenRango viven en @/lib/rangos: un page.tsx solo puede
+// exportar el conjunto fijo de simbolos de ruta de Next.js.
 
 export default async function PaginaProductosPropios() {
   const sesion = await obtenerSesionConsola();

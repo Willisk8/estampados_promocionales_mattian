@@ -1,17 +1,13 @@
 import Link from "next/link";
 import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
 import { SinAcceso } from "@/componentes/sin-acceso";
-import { rangoLegible } from "../page";
+import { rangoLegible, ordenRango } from "@/lib/rangos";
 
 export const dynamic = "force-dynamic";
 
 const cop = (v: number) => "$" + v.toLocaleString("es-CO", { maximumFractionDigits: 0 });
 const pct = (v: number) => (v * 100).toFixed(1) + " %";
 
-function ordenRango(rango: string): number {
-  const m = rango.match(/^[\[(](\d*),/);
-  return m && m[1] ? Number(m[1]) : 0;
-}
 
 export default async function PaginaProductoPropio({
   params,
