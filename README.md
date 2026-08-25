@@ -19,6 +19,7 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 | Cuarentena emails malformados | ✓ Aplicada | Migración `014` — 58 canales `REVIEW_REQUIRED` |
 | Calidad de datos | ✓ Score 87/100 | Reporte en `docs/data_quality_report.md` |
 | Gates pre-piloto | ⚠ Pendiente | Ver `docs/pre_pilot_gates.md` |
+| Plan de cierre MVP | ⚠ En ejecución | Ver `docs/plan_trabajo_cierre_mvp.md` |
 | CI/CD a STAGING | ✓ Activo | GitHub Actions — rama `staging` |
 | Rama principal | ⚠ Gobernanza MVP | `staging` es la rama desplegable a STAGING; `master` puede adelantarse mientras haya cambios pendientes de promover |
 | Supabase PROD | — No iniciado | Plan explícito en `docs/staging_prod_separation_plan.md` |
@@ -61,6 +62,7 @@ estampados/
 ├── docs/
 │   ├── data_quality_report.md      # Reporte de calidad — corte 2026-08-25
 │   ├── catalogo_propio_mvp.md      # Modelo para convertir costos proveedor en precios propios
+│   ├── plan_trabajo_cierre_mvp.md  # Plan maestro para cerrar catálogo, calculadora y gates
 │   ├── pre_pilot_gates.md          # Bloqueos antes de campaña/piloto
 │   └── supabase-staging-setup.md   # Guía de configuración inicial
 ├── .github/
@@ -428,8 +430,14 @@ producción.
 
 ## Próximos pasos
 
+Plan maestro: [`docs/plan_trabajo_cierre_mvp.md`](docs/plan_trabajo_cierre_mvp.md).
+
 | Prioridad | Tarea |
 |---|---|
+| Alta | Publicar/sincronizar `021_marking_technique_costs.sql` en GitHub y rama `staging` |
+| Alta | Curar costos de técnicas de marcación para definir cuáles alimentan cálculo automático |
+| Alta | Ajustar la calculadora para usar costos versionados de proveedor y marcación |
+| Alta | Cerrar 5 productos propios MVP y probar `resolve_price()` de punta a punta |
 | Alta | Corregir o invalidar los 58 emails en cuarentena (`REVIEW_REQUIRED`) |
 | Alta | Segmentar emails corporativos/rol/personales y no activar personales scrapeados sin consentimiento o base legal documentada |
 | Alta | No habilitar campañas hasta cambiar contactabilidad de `DESCONOCIDA` a base válida |
