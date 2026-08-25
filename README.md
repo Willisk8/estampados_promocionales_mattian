@@ -14,6 +14,7 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 | CRM — organizaciones y personas | ✓ Cargado | 5,639 organizaciones · 4,642 personas |
 | CRM — canales de contacto | ✓ Cargado | 16,211 canales (email, teléfono, WhatsApp, web) |
 | Catálogo proveedores | ✓ Cargado | 7 proveedores · 935 productos · 934 snapshots de precio |
+| Propiedad horizontal | ✓ Pipeline · ⚠ no cargado | 25 fuentes territoriales · 23,799 PH · 8,342 residenciales; sin importador Supabase todavía |
 | Vistas operativas | ✓ Activas | Migraciones `013` y `015` |
 | Cuarentena emails malformados | ✓ Aplicada | Migración `014` — 58 canales `REVIEW_REQUIRED` |
 | Calidad de datos | ✓ Score 87/100 | Reporte en `docs/data_quality_report.md` |
@@ -54,6 +55,9 @@ estampados/
 │   ├── scrape.py
 │   ├── promotional_products/
 │   └── residential_properties/
+│       ├── scraper.py            # Consolida fuentes territoriales oficiales
+│       ├── coverage.py           # Cruza DIVIPOLA, SUIT y genera cola de validación
+│       └── enrich.py             # Evidencia web de correo, teléfono y WhatsApp
 ├── docs/
 │   ├── data_quality_report.md      # Reporte de calidad — corte 2026-08-25
 │   ├── catalogo_propio_mvp.md      # Modelo para convertir costos proveedor en precios propios
@@ -275,6 +279,52 @@ python scripts/import/import_catalogo.py --file outputs/.../catalogo_promocional
 
 ---
 
+## Pipeline de propiedad horizontal
+
+`scraping/residential_properties/` es el tercer pipeline de datos del proyecto.
+Consolida registros territoriales de propiedad horizontal, clasifica el
+subconjunto residencial, audita cobertura alcaldía por alcaldía y enriquece
+contactos públicos con evidencia y niveles de confianza.
+
+```powershell
+cd scraping/residential_properties
+
+# Descargar y normalizar fuentes territoriales
+python scraper.py run --user-agent "EstampadosData/1.0 (correo@dominio.co)"
+python scraper.py verify
+
+# Cruzar 1,122 territorios DIVIPOLA con trámites SUIT
+python coverage.py --user-agent "EstampadosData/1.0 (correo@dominio.co)"
+
+# Buscar contactos en sitios públicos asociados y verificar salidas
+python enrich.py crawl --user-agent "EstampadosData/1.0 (correo@dominio.co)"
+python enrich.py verify
+```
+
+Estado del último corte local, 2026-08-25:
+
+| Métrica | Resultado |
+|---|---:|
+| Fuentes territoriales integradas | 25 |
+| Propiedades horizontales consolidadas | 23,799 |
+| Conjuntos residenciales confirmados o probables | 8,342 |
+| Territorios DIVIPOLA auditados | 1,122 |
+| Trámites SUIT localizados | 1,505 |
+| Conjuntos en cola de validación | 8,342 |
+
+Los archivos crudos, resultados y contactos quedan fuera de Git mediante
+`scraping/**/outputs/`. El código y las configuraciones reproducibles sí se
+versionan. La documentación operativa completa está en
+[`scraping/residential_properties/README.md`](scraping/residential_properties/README.md).
+
+**Estado Supabase:** este pipeline todavía no alimenta STAGING. No existe un
+importador ni un mapeo aprobado hacia `organizacion`, `persona`,
+`persona_organizacion` y `canal_contacto`. Antes de cargarlo se debe definir la
+deduplicación con las organizaciones existentes, separar contactos corporativos
+de datos personales y conservar la fecha/URL de cada evidencia.
+
+---
+
 ## Catálogo propio MVP
 
 El catálogo proveedor cargado no es todavía el catálogo vendible. Para transformar costos reales en precios comerciales propios se agregó:
@@ -358,6 +408,7 @@ python scripts/analytics/data_quality_probe.py > docs/data_quality_raw.json
 | Alta | Respaldar `HMAC_SUPPRESSION_SECRET` fuera del entorno y definir purga de `import_raw_row` |
 | Alta | Marcar NaturalGraphic y Verona como proveedores con revisión de precio obligatoria |
 | Media | Resolver los 824 ítems MEDIUM de revisión de organizaciones |
+| Media | Diseñar y probar el importador idempotente de propiedad horizontal antes de cargarlo en Supabase STAGING |
 | Media | Diseñar catálogo propio vendible: productos, variantes, costos, márgenes y escalas |
 | Media | Migraciones comerciales siguientes: `campania`, `envio_campania`, `evento` |
 | Media | Etapas futuras: `conversacion`, `mensaje`, `oportunidad`, `cotizacion`, `detalle_cotizacion` |

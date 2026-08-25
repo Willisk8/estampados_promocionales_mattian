@@ -156,12 +156,60 @@ def run(args: argparse.Namespace) -> None:
     write_csv(OUTPUT / "tramites_alcaldias_propiedad_horizontal.csv", procedure_rows, procedure_fields)
     pending = [row for row in coverage if row["coverage_status"] != "BASE_ABIERTA_INTEGRADA"]
     write_csv(OUTPUT / "municipios_pendientes_fuente_abierta.csv", pending, coverage_fields)
+
+    coverage_by_place = {
+        join_key(row["department"], row["municipality"]): row for row in coverage
+    }
+    validation_queue: list[dict[str, Any]] = []
+    residential_path = OUTPUT / "conjuntos_residenciales_colombia.csv"
+    if residential_path.exists():
+        with residential_path.open(encoding="utf-8-sig", newline="") as handle:
+            for row in csv.DictReader(handle):
+                territory = coverage_by_place.get(join_key(row["department"], row["municipality"]), {})
+                gaps = []
+                if not clean(row.get("legal_representative")):
+                    gaps.append("representante_legal")
+                elif clean(row.get("representative_temporal_status")) != "FUENTE_RECIENTE_NO_CERTIFICADA":
+                    gaps.append("vigencia_representante")
+                if not clean(row.get("email")):
+                    gaps.append("correo")
+                if not clean(row.get("phone")):
+                    gaps.append("telefono_whatsapp")
+                validation_queue.append({
+                    "record_id": row["record_id"],
+                    "department": row["department"],
+                    "municipality": row["municipality"],
+                    "property_name": row["property_name"],
+                    "nit": row["nit"],
+                    "address": row["address"],
+                    "legal_representative_at_source_date": row["legal_representative"],
+                    "representative_temporal_status": row["representative_temporal_status"],
+                    "email_at_source": row["email"],
+                    "phone_at_source": row["phone"],
+                    "missing_or_pending_fields": "; ".join(gaps),
+                    "municipality_coverage_status": territory.get("coverage_status", ""),
+                    "suit_viewer_urls": territory.get("suit_viewer_urls", ""),
+                    "recommended_action": "Consultar certificado/registro vigente ante la alcaldía y solicitar únicamente contactos institucionales públicos",
+                })
+    validation_queue.sort(key=lambda row: (
+        0 if "vigencia_representante" in row["missing_or_pending_fields"] else 1,
+        0 if "representante_legal" in row["missing_or_pending_fields"] else 1,
+        key(row["department"]), key(row["municipality"]), key(row["property_name"]),
+    ))
+    validation_fields = [
+        "record_id", "department", "municipality", "property_name", "nit", "address",
+        "legal_representative_at_source_date", "representative_temporal_status",
+        "email_at_source", "phone_at_source", "missing_or_pending_fields",
+        "municipality_coverage_status", "suit_viewer_urls", "recommended_action",
+    ]
+    write_csv(OUTPUT / "cola_validacion_conjuntos.csv", validation_queue, validation_fields)
     summary = {
         "territories": len(coverage),
         "territories_with_open_data": sum(row["coverage_status"] == "BASE_ABIERTA_INTEGRADA" for row in coverage),
         "territories_with_registry_procedure_only": sum(row["coverage_status"] == "TRAMITE_LOCAL_SIN_BASE_ABIERTA_LOCALIZADA" for row in coverage),
         "territories_without_located_source": sum(row["coverage_status"] == "SIN_FUENTE_NI_TRAMITE_LOCALIZADO" for row in coverage),
         "registry_procedures": len(procedure_rows),
+        "residential_records_in_validation_queue": len(validation_queue),
         "note": "SUIT es un inventario de trámites, no una base de copropiedades ni prueba de vigencia actual.",
     }
     (OUTPUT / "resumen_cobertura_municipal.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")

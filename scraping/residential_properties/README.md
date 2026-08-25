@@ -71,6 +71,8 @@ python scraper.py run --sources a9yz-vh6j
   localizados para registro, representación o certificación.
 - `outputs/municipios_pendientes_fuente_abierta.csv`: cola de alcaldías sin base
   abierta integrada.
+- `outputs/cola_validacion_conjuntos.csv`: conjunto por conjunto, campos faltantes,
+  estado temporal del representante y enlace SUIT de la alcaldía competente.
 - `outputs/enrichment/conjuntos_residenciales_enriquecidos.csv`: base residencial
   con correos, teléfonos, WhatsApp, sitio y nivel de confianza.
 - `outputs/enrichment/evidencia_contactos_web.csv`: evidencia completa, incluida
