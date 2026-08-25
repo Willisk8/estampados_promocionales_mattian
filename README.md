@@ -9,7 +9,7 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 | Componente | Estado | Detalle |
 |---|---|---|
 | Infraestructura Supabase STAGING | ✓ Completo | Proyecto `psereyjwjpyakkmnabgm`, región us-west-2 Oregon |
-| Migraciones `000`–`015` | ✓ Aplicadas | 16 migraciones en STAGING |
+| Migraciones `000`–`017` | ✓ Aplicadas/pendientes CI | 18 migraciones numeradas; deploy idempotente vía `schema_migrations` |
 | Motor de precios (`resolve_price`) | ✓ Operativo | Tests A–F pasando |
 | CRM — organizaciones y personas | ✓ Cargado | 5,639 organizaciones · 4,642 personas |
 | CRM — canales de contacto | ✓ Cargado | 16,211 canales (email, teléfono, WhatsApp, web) |
@@ -19,8 +19,8 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 | Calidad de datos | ✓ Score 87/100 | Reporte en `docs/data_quality_report.md` |
 | Gates pre-piloto | ⚠ Pendiente | Ver `docs/pre_pilot_gates.md` |
 | CI/CD a STAGING | ✓ Activo | GitHub Actions — rama `staging` |
-| Rama principal | ✓ Actualizada | `master` y `staging` apuntan al mismo commit base |
-| Supabase PROD | — No iniciado | Separar cuando STAGING esté curado |
+| Rama principal | ✓ Actualizada | `master` y `staging` apuntan al mismo commit; separación PROD aún no existe |
+| Supabase PROD | — No iniciado | Plan explícito en `docs/staging_prod_separation_plan.md` |
 
 ---
 
@@ -29,7 +29,7 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 ```
 estampados/
 ├── database/
-│   ├── migrations/          # Migraciones SQL numeradas (000–015)
+│   ├── migrations/          # Migraciones SQL numeradas
 │   ├── tests/               # Tests de precio y CRM/contactabilidad
 │   └── documentation/
 │       └── migrations-guide.md
@@ -45,10 +45,15 @@ estampados/
 │   ├── analytics/
 │   │   ├── data_quality_probe.py    # 20+ queries de calidad de datos → JSON
 │   │   └── post_load_checks.sql     # Verificaciones post-carga
-│   ├── apply_migrations.ps1
 │   ├── apply_pending_migrations.ps1
 │   ├── check_env.py
 │   └── run_db_tests.ps1
+├── tests/
+│   └── test_pricing_model.py       # Tests unitarios Python del motor de precios
+├── scraping/                       # Código de scraping versionado; datos/outputs ignorados
+│   ├── scrape.py
+│   ├── promotional_products/
+│   └── residential_properties/
 ├── docs/
 │   ├── data_quality_report.md      # Reporte de calidad — corte 2026-08-25
 │   ├── catalogo_propio_mvp.md      # Modelo para convertir costos proveedor en precios propios
@@ -62,7 +67,7 @@ estampados/
 └── .gitignore
 ```
 
-> `scraping/` y `outputs/` pueden existir localmente en el workspace para reproducir cargas y análisis, pero no deben versionarse porque contienen datos fuente, NITs, correos, teléfonos u otros datos sensibles. El README documenta el flujo; el repositorio versionado no debe incluir esas bases crudas.
+> El código de `scraping/` sí se versiona para continuidad del proyecto. Sus datos crudos, procesados, outputs, caches y archivos con PII siguen fuera de Git por `.gitignore`.
 
 ---
 
@@ -114,6 +119,7 @@ pwsh ./scripts/apply_pending_migrations.ps1
 ```
 
 El script aplica solo las migraciones que no están registradas en `schema_migrations`.
+No usar scripts no idempotentes para migraciones. El único flujo manual soportado es `apply_pending_migrations.ps1`.
 
 ### Tabla de migraciones
 
@@ -135,6 +141,8 @@ El script aplica solo las migraciones que no están registradas en `schema_migra
 | `013_operational_views.sql` | Vistas: CRM, revisión de importación, calidad de catálogo, elegibilidad |
 | `014_quarantine_malformed_email_domains.sql` | Cuarentena de 58 emails con dominios malformados por concatenación |
 | `015_email_quality_classification.sql` | Clasificación fina de emails para segmentación pre-piloto |
+| `016_fix_security_invoker_views.sql` | Corrige vistas detectadas como SECURITY DEFINER por linter Supabase |
+| `017_supplier_price_purchase_terms.sql` | Agrega condiciones de compra proveedor para costos variables |
 
 ### Convenciones obligatorias
 
@@ -154,6 +162,14 @@ pwsh ./scripts/run_db_tests.ps1
 ```
 
 Los tests corren dentro de una transacción con `ROLLBACK` final — no modifican datos.
+
+### Tests Python
+
+```powershell
+python -m unittest discover -s tests
+```
+
+CI ejecuta estos tests antes de aplicar migraciones SQL.
 
 **Casos cubiertos — motor de precios:**
 
@@ -192,7 +208,12 @@ SUPABASE_STAGING_DATABASE_URL = postgresql://postgres.PROJECT_ID:PASSWORD@...sup
 1. Crea la tabla `schema_migrations` si no existe (idempotente)
 2. Aplica solo las migraciones pendientes en orden numérico
 3. Registra cada migración aplicada en `schema_migrations`
-4. Corre todos los tests de `database/tests/`
+4. Corre tests Python del motor de precios
+5. Corre todos los tests de `database/tests/`
+
+### Separación PROD
+
+No existe todavía un entorno PROD real. `master` y `staging` pueden estar sincronizadas durante el MVP, pero el deploy automático solo apunta a STAGING. El plan para PROD vive en [`docs/staging_prod_separation_plan.md`](docs/staging_prod_separation_plan.md).
 
 ---
 
@@ -206,6 +227,8 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
+
+Las dependencias están fijadas por versión exacta para reducir drift entre ejecuciones.
 
 ### Cargar entidades solidarias
 

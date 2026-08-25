@@ -30,6 +30,10 @@ Aplicar en orden numérico estricto. Cada migración depende de las anteriores.
 pwsh ./scripts/apply_pending_migrations.ps1
 ```
 
+`apply_pending_migrations.ps1` es el único script manual soportado para
+migraciones. No usar scripts que reapliquen todo el directorio sin consultar
+`schema_migrations`.
+
 > NUNCA incluir credenciales en archivos versionados.
 > Usar variables de entorno o Supabase Vault.
 

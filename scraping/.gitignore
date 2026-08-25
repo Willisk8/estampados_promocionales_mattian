@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+data/processed/
+data/web/
+logs/
+promotional_products/__pycache__/

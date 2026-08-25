@@ -1,0 +1,20 @@
+{
+  "user_agent": "EstampadosContactResearch/1.0 (+contacto: cambie-este-correo@example.com)",
+  "request_delay_seconds": 0.1,
+  "timeout_seconds": 8,
+  "max_pages_per_entity": 4,
+  "workers": 32,
+  "contact_paths": [
+    "",
+    "/contacto",
+    "/contactenos",
+    "/nosotros",
+    "/quienes-somos",
+    "/quienes_somos",
+    "/acerca-de",
+    "/directorio",
+    "/canales-de-atencion",
+    "/servicio-al-asociado",
+    "/pqrs"
+  ]
+}

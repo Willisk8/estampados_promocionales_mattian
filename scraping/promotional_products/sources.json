@@ -1,0 +1,111 @@
+{
+  "user_agent": "EstampadosPromoResearch/1.0 (+catalogo publico; contacto: configure-un-correo@example.com)",
+  "request_delay_seconds": 0.2,
+  "timeout_seconds": 30,
+  "sources": [
+    {
+      "id": "tienda_fla",
+      "name": "Tienda FLA / Grupo FLA SAS",
+      "adapter": "tienda_fla",
+      "base_url": "https://tiendafla.com",
+      "city": "Bogotá",
+      "department": "Bogotá D.C.",
+      "country": "Colombia",
+      "category_urls": [
+        "https://tiendafla.com/categoria/productos-promocionales/botones-y-botoneras/59",
+        "https://tiendafla.com/categoria/productos-promocionales/esferos/64",
+        "https://tiendafla.com/categoria/productos-promocionales/gorras/70",
+        "https://tiendafla.com/categoria/productos-promocionales/carama%C3%B1olas-y-termos/84",
+        "https://tiendafla.com/categoria/productos-promocionales/otros/92",
+        "https://tiendafla.com/categoria/productos-promocionales/mugs/94",
+        "https://tiendafla.com/categoria/productos-promocionales/llaveros/96",
+        "https://tiendafla.com/categoria/productos-promocionales/pad-mouse/97",
+        "https://tiendafla.com/categoria/productos-promocionales/gafetes-e-imanes/105",
+        "https://tiendafla.com/categoria/productos-promocionales/cintas-y-reatas-para-marcar/109",
+        "https://tiendafla.com/categoria/productos-promocionales/camisetas/110",
+        "https://tiendafla.com/categoria/productos-promocionales/relojes/111",
+        "https://tiendafla.com/categoria/serigrafia/promocionales/80"
+      ]
+    },
+    {
+      "id": "esferos_com",
+      "name": "Esferos.com / Botón Promo SAS",
+      "adapter": "shopify_collections",
+      "base_url": "https://esferos.com",
+      "city": "Bogotá",
+      "department": "Bogotá D.C.",
+      "country": "Colombia",
+      "collections": [
+        "esferos", "esferos-de-alta-gama", "esferos-publicitarios",
+        "esferos-ecologicos", "esferos-tematicos", "estuches-kits",
+        "resaltadores", "lapices", "promocionales", "agendas", "alcancias",
+        "botilitos", "bolsas", "ecologicos", "escolar-oficina",
+        "gorras-y-camisetas", "identificacion", "laser", "llaveros",
+        "morrales", "mugs", "sombrillas", "sublimacion",
+        "tecnologia-y-gadgets", "usb"
+      ]
+    },
+    {
+      "id": "colorisa_studio",
+      "name": "Colorisa Studio",
+      "adapter": "generic_public_page",
+      "base_url": "https://colorisastudio.com",
+      "city": "Bogotá",
+      "department": "Bogotá D.C.",
+      "country": "Colombia",
+      "page_urls": ["https://colorisastudio.com/productos"]
+    },
+    {
+      "id": "verona_studio",
+      "name": "Verona Studio",
+      "adapter": "generic_public_page",
+      "base_url": "https://veronastudio.com.co",
+      "city": "Bogotá",
+      "department": "Bogotá D.C.",
+      "country": "Colombia",
+      "page_urls": ["https://veronastudio.com.co/"]
+    },
+    {
+      "id": "natural_graphic",
+      "name": "NaturalGraphic",
+      "adapter": "generic_public_page",
+      "base_url": "https://naturalgraphic.com.co",
+      "city": "Bogotá",
+      "department": "Bogotá D.C.",
+      "country": "Colombia",
+      "page_urls": ["https://naturalgraphic.com.co/sublmacion/"]
+    },
+    {
+      "id": "macbrand",
+      "name": "MacBrand Digital",
+      "adapter": "generic_public_page",
+      "base_url": "https://www.macbrand.co",
+      "city": "Bogotá",
+      "department": "Bogotá D.C.",
+      "country": "Colombia",
+      "page_urls": ["https://www.macbrand.co/"]
+    },
+    {
+      "id": "ingenios_col",
+      "name": "INGenios Maquinando Ideas",
+      "adapter": "woocommerce_store_api",
+      "base_url": "https://www.ingenioscol.com",
+      "city": "Villavicencio",
+      "department": "Meta",
+      "country": "Colombia",
+      "promotional_only": true
+    },
+    {
+      "id": "sublifly",
+      "name": "Sublifly / Sublimatic SAS",
+      "adapter": "woocommerce_store_api",
+      "base_url": "https://www.sublifly.co",
+      "city": "Bogotá",
+      "department": "Bogotá D.C.",
+      "country": "Colombia",
+      "promotional_only": true,
+      "include_category_regex": "mugs?|vasos?|caramanolas?|termos?|textiles?|sublimables?|portarretratos?|llaveros?|gorras?|rompecabezas|cojines?|bolsos?|tulas?",
+      "exclude_regex": "maquinas?|termofijadoras?|planchas?|impresoras?|tintas?|papeles?|repuestos?|resistencias?"
+    }
+  ]
+}

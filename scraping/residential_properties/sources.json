@@ -1,0 +1,29 @@
+{
+  "sources": [
+    {"id":"bogota-conjuntos-2023","name":"Conjuntos residenciales y cerrados de Bogotá","department":"Bogotá D.C.","municipality":"Bogotá D.C.","type":"csv","data_url":"https://datosabiertos.bogota.gov.co/dataset/8ca6901d-7a1e-4cab-86cb-84b90035918b/resource/80371437-fe09-4f65-bdcd-0c267e6c3219/download/prop_horizontal_bogota_marzo2023.csv","source_url":"https://datosabiertos.bogota.gov.co/dataset/conjuntos-residencias-y-cerrados-bogota","source_data_updated_at":"2023-03-23T21:13:33Z","delimiter":";"},
+    {"id":"bm69-5m9v","name":"Conjuntos residenciales de El Espinal","department":"Tolima","municipality":"El Espinal","filters":{"vereda_barrio_conjunto":"Conjunto Residencial"}},
+    {"id":"a9yz-vh6j","name":"Propiedad Horizontal de Villavicencio","department":"Meta","municipality":"Villavicencio"},
+    {"id":"j6w9-gezc","name":"Registro de Propiedad Horizontal de Barranquilla","department":"Atlántico","municipality":"Barranquilla"},
+    {"id":"gd7m-77wv","name":"Propiedad Horizontal de Madrid","department":"Cundinamarca","municipality":"Madrid"},
+    {"id":"t4ks-awg9","name":"Propiedades Horizontales de Fusagasugá","department":"Cundinamarca","municipality":"Fusagasugá"},
+    {"id":"jdhy-vhhj","name":"Propiedad Horizontal de Ricaurte","department":"Cundinamarca","municipality":"Ricaurte"},
+    {"id":"aqq4-hmf7","name":"Propiedades Horizontales de Bucaramanga","department":"Santander","municipality":"Bucaramanga"},
+    {"id":"hzv2-eed9","name":"Propiedad Horizontal de Pereira","department":"Risaralda","municipality":"Pereira"},
+    {"id":"xip9-wzwa","name":"Propiedad Horizontal de Funza","department":"Cundinamarca","municipality":"Funza"},
+    {"id":"xnqi-dbxu","name":"Propiedad Horizontal de Facatativá","department":"Cundinamarca","municipality":"Facatativá"},
+    {"id":"7v8m-zcmy","name":"Propiedad Horizontal de La Estrella","department":"Antioquia","municipality":"La Estrella"},
+    {"id":"bw6q-kmd6","name":"Propiedades Horizontales de Sopó","department":"Cundinamarca","municipality":"Sopó"},
+    {"id":"7nqq-3qnk","name":"Propiedad Horizontal de Mosquera","department":"Cundinamarca","municipality":"Mosquera"},
+    {"id":"q9gn-x9rk","name":"Propiedades Horizontales de Cajicá","department":"Cundinamarca","municipality":"Cajicá"},
+    {"id":"tayx-mpmp","name":"Propiedades Horizontales de Chía","department":"Cundinamarca","municipality":"Chía"},
+    {"id":"gzqa-jtks","name":"Propiedad Horizontal de Neiva","department":"Huila","municipality":"Neiva"},
+    {"id":"yt69-qmjq","name":"Propiedad Horizontal de Armenia","department":"Quindío","municipality":"Armenia"},
+    {"id":"9cct-gi4w","name":"Propiedad Horizontal de Piedecuesta","department":"Santander","municipality":"Piedecuesta"},
+    {"id":"jnxz-xs2c","name":"Propiedad Horizontal de Valledupar","department":"Cesar","municipality":"Valledupar"},
+    {"id":"mbsg-msf3","name":"Propiedad Horizontal de Dosquebradas","department":"Risaralda","municipality":"Dosquebradas"},
+    {"id":"tvac-b7hk","name":"Propiedades Horizontales de Tunja","department":"Boyacá","municipality":"Tunja"},
+    {"id":"cqdc-kanw","name":"Propiedades Horizontales de Pasto","department":"Nariño","municipality":"Pasto"},
+    {"id":"3aac-ijcg","name":"Propiedades Horizontales de Palmira","department":"Valle del Cauca","municipality":"Palmira"},
+    {"id":"axq4-qnd3","name":"Propiedad Horizontal de Santa Rosa de Cabal","department":"Risaralda","municipality":"Santa Rosa de Cabal"}
+  ]
+}
