@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
 import { SinAcceso } from "@/componentes/sin-acceso";
+import {
+  actualizarEstadoComercial,
+  clasificarTipoOrganizacion,
+} from "./acciones";
 
 export const dynamic = "force-dynamic";
 
@@ -24,21 +28,42 @@ type Persona = {
   estado: string;
 };
 
+type TipoOrganizacion = {
+  id: string;
+  codigo: string;
+  descripcion: string;
+};
+
+type RelacionComercial = {
+  estado_comercial: string;
+  prioridad: string;
+  notas: string | null;
+};
+
 export default async function PaginaOrganizacion({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ ok?: string; error?: string }>;
 }) {
   const sesion = await obtenerSesionConsola();
   if (!sesion) return <SinAcceso />;
 
   const { id } = await params;
+  const sp = await searchParams;
   const supabase = await crearClienteServidor();
 
-  const [org, canales, personas] = await Promise.all([
+  const [org, canales, personas, tipos, comercial] = await Promise.all([
     supabase.from("organizacion").select("*").eq("id_organizacion", id).maybeSingle(),
     supabase.rpc("fn_consola_canales_organizacion", { p_id_organizacion: id }),
     supabase.rpc("fn_consola_personas_organizacion", { p_id_organizacion: id }),
+    supabase.from("cat_tipo_organizacion").select("id, codigo, descripcion").order("codigo"),
+    supabase
+      .from("relacion_comercial_organizacion")
+      .select("estado_comercial, prioridad, notas")
+      .eq("id_organizacion", id)
+      .maybeSingle(),
   ]);
 
   if (!org.data) {
@@ -55,7 +80,11 @@ export default async function PaginaOrganizacion({
   const o = org.data;
   const listaCanales = (canales.data ?? []) as Canal[];
   const listaPersonas = (personas.data ?? []) as Persona[];
+  const listaTipos = (tipos.data ?? []) as TipoOrganizacion[];
+  const relacion = comercial.data as RelacionComercial | null;
+  const tipoActual = listaTipos.find((t) => t.id === o.id_tipo_organizacion);
   const hayEnmascarado = listaCanales.some((c) => c.enmascarado);
+  const puedeEditar = sesion.rol === "ADMIN" || sesion.rol === "COMERCIAL";
 
   return (
     <>
@@ -64,6 +93,9 @@ export default async function PaginaOrganizacion({
       </p>
       <h1>{o.nombre_legal}</h1>
       <p className="subtitulo">{o.nombre_comercial ?? "Sin nombre comercial"}</p>
+
+      {sp.ok && <div className="aviso-caja neutro">Cambio guardado.</div>}
+      {sp.error && <div className="aviso-caja">{sp.error}</div>}
 
       <h2>Datos generales</h2>
       <div className="tarjeta">
@@ -76,11 +108,19 @@ export default async function PaginaOrganizacion({
           <dd>{o.tipo_entidad_origen ?? "—"}</dd>
           <dt>Tipo normalizado</dt>
           <dd>
-            {o.id_tipo_organizacion ? (
-              o.id_tipo_organizacion
+            {tipoActual ? (
+              `${tipoActual.codigo} - ${tipoActual.descripcion}`
             ) : (
-              <span className="insignia aviso">pendiente — Etapa C</span>
+              <span className="insignia aviso">pendiente</span>
             )}
+          </dd>
+          <dt>Estado comercial</dt>
+          <dd>
+            <span className={relacion?.estado_comercial === "CLIENTE" ? "insignia" : "insignia neutra"}>
+              {relacion?.estado_comercial ?? "PROSPECTO"}
+            </span>
+            {" "}
+            <span className="insignia neutra">{relacion?.prioridad ?? "MEDIA"}</span>
           </dd>
           <dt>Ubicacion</dt>
           <dd>{[o.municipio, o.departamento].filter(Boolean).join(", ") || "—"}</dd>
@@ -99,6 +139,73 @@ export default async function PaginaOrganizacion({
               : "—"}
           </dd>
         </dl>
+      </div>
+
+      <h2>Gestion comercial</h2>
+      <div className="tarjeta">
+        <form action={actualizarEstadoComercial} className="filtros">
+          <input type="hidden" name="id" value={id} />
+          <select
+            name="estado_comercial"
+            defaultValue={relacion?.estado_comercial ?? "PROSPECTO"}
+            disabled={!puedeEditar}
+          >
+            <option value="PROSPECTO">Prospecto</option>
+            <option value="CLIENTE">Cliente</option>
+            <option value="DESCARTADO">Descartado</option>
+            <option value="INACTIVO">Inactivo</option>
+          </select>
+          <select
+            name="prioridad"
+            defaultValue={relacion?.prioridad ?? "MEDIA"}
+            disabled={!puedeEditar}
+          >
+            <option value="ALTA">Prioridad alta</option>
+            <option value="MEDIA">Prioridad media</option>
+            <option value="BAJA">Prioridad baja</option>
+          </select>
+          <input
+            name="notas"
+            placeholder="Notas comerciales"
+            defaultValue={relacion?.notas ?? ""}
+            disabled={!puedeEditar}
+          />
+          <button type="submit" disabled={!puedeEditar}>
+            Guardar estado
+          </button>
+        </form>
+
+        <form action={clasificarTipoOrganizacion} className="filtros">
+          <input type="hidden" name="id" value={id} />
+          <select
+            name="tipo_codigo"
+            defaultValue={tipoActual?.codigo ?? ""}
+            disabled={!puedeEditar}
+            required
+          >
+            <option value="">Tipo normalizado</option>
+            {listaTipos.map((t) => (
+              <option key={t.id} value={t.codigo}>
+                {t.codigo} - {t.descripcion}
+              </option>
+            ))}
+          </select>
+          <input
+            name="criterio"
+            placeholder="Criterio de clasificacion"
+            defaultValue="MANUAL"
+            disabled={!puedeEditar}
+          />
+          <button type="submit" disabled={!puedeEditar}>
+            Guardar tipo
+          </button>
+        </form>
+        {!puedeEditar && (
+          <p className="subtitulo" style={{ marginBottom: 0 }}>
+            Tu rol puede consultar, pero solo ADMIN y COMERCIAL pueden actualizar
+            clasificaciones.
+          </p>
+        )}
       </div>
 
       <h2>Canales de contacto ({listaCanales.length})</h2>

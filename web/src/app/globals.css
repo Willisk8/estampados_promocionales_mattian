@@ -230,6 +230,14 @@ td.num {
   flex-wrap: wrap;
   margin-bottom: 14px;
 }
+.form-inline {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.form-inline input {
+  width: 150px;
+}
 input,
 select,
 button {

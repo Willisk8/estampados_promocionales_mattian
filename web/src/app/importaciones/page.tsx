@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
 import { SinAcceso } from "@/componentes/sin-acceso";
+import { resolverRevision } from "./acciones";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ const insigniaSeveridad = (s: string) =>
 export default async function PaginaImportaciones({
   searchParams,
 }: {
-  searchParams: Promise<{ sev?: string; p?: string }>;
+  searchParams: Promise<{ sev?: string; p?: string; ok?: string; error?: string }>;
 }) {
   const sesion = await obtenerSesionConsola();
   if (!sesion) return <SinAcceso />;
@@ -69,6 +70,8 @@ export default async function PaginaImportaciones({
     q.set("p", String(p));
     return `/importaciones?${q}`;
   };
+  const retornoActual = url(pagina);
+  const puedeResolver = sesion.rol === "ADMIN" || sesion.rol === "COMERCIAL";
 
   return (
     <>
@@ -117,6 +120,11 @@ export default async function PaginaImportaciones({
 
       <h2>Cola de revision abierta ({total.toLocaleString("es-CO")})</h2>
 
+      {sp.ok === "revision" && (
+        <div className="aviso-caja neutro">Revision resuelta y auditada.</div>
+      )}
+      {sp.error && <div className="aviso-caja">{sp.error}</div>}
+
       <div className="filtros">
         <Link href={url(1, undefined)} className="nav-enlace">
           Todas
@@ -129,11 +137,12 @@ export default async function PaginaImportaciones({
         </Link>
       </div>
 
-      <div className="aviso-caja neutro">
-        Esta cola es de solo lectura en la Etapa B. Resolver un item es la unica
-        escritura prevista, y llega con su registro de auditoria en una migracion
-        aparte.
-      </div>
+      {!puedeResolver && (
+        <div className="aviso-caja neutro">
+          Tu rol puede consultar la cola, pero solo ADMIN y COMERCIAL pueden
+          resolver items.
+        </div>
+      )}
 
       <div className="tabla-contenedor">
         <table>
@@ -146,6 +155,7 @@ export default async function PaginaImportaciones({
               <th className="num">Fila</th>
               <th>Fuente</th>
               <th>Detectado</th>
+              <th>Resolver</th>
             </tr>
           </thead>
           <tbody>
@@ -160,11 +170,31 @@ export default async function PaginaImportaciones({
                 <td className="num">{r.row_number}</td>
                 <td>{r.source_name}</td>
                 <td>{new Date(r.review_created_at).toLocaleDateString("es-CO")}</td>
+                <td>
+                  <form action={resolverRevision} className="form-inline">
+                    <input type="hidden" name="id" value={r.id_import_review_item} />
+                    <input type="hidden" name="retorno" value={retornoActual} />
+                    <select name="estado" defaultValue="IGNORED" disabled={!puedeResolver}>
+                      <option value="APPROVED">Aprobar</option>
+                      <option value="REJECTED">Rechazar</option>
+                      <option value="MERGED">Fusionar</option>
+                      <option value="IGNORED">Ignorar</option>
+                    </select>
+                    <input
+                      name="notas"
+                      placeholder="Notas"
+                      disabled={!puedeResolver}
+                    />
+                    <button type="submit" disabled={!puedeResolver}>
+                      Guardar
+                    </button>
+                  </form>
+                </td>
               </tr>
             ))}
             {filas.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ color: "var(--texto-suave)" }}>
+                <td colSpan={8} style={{ color: "var(--texto-suave)" }}>
                   Sin items abiertos con este filtro.
                 </td>
               </tr>

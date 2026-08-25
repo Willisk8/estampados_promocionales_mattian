@@ -94,10 +94,9 @@ export default async function PaginaResumen() {
       {r.organizaciones_sin_tipo > 0 && (
         <div className="aviso-caja">
           <strong>{r.organizaciones_sin_tipo.toLocaleString("es-CO")}</strong>{" "}
-          organizaciones no tienen tipo normalizado. Por eso la pantalla de
-          organizaciones muestra el texto de origen y todavia no ofrece un filtro
-          por fondo, cooperativa o mutual: un filtro que devuelve cero resultados
-          seria peor que no tenerlo. La normalizacion es trabajo de la Etapa C.
+          organizaciones no tienen tipo normalizado. La ficha de cada
+          organizacion ya permite clasificar el tipo con auditoria, conservando
+          el texto de origen para trazabilidad.
         </div>
       )}
 

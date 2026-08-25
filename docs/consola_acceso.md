@@ -1,7 +1,7 @@
 # Consola interna — acceso y puesta en marcha
 
-Etapa B del plan de consola. Solo lectura, solo `localhost`, contra Supabase
-STAGING.
+Consola privada contra Supabase STAGING. Lee con la sesion del usuario y solo
+escribe mediante RPC auditadas.
 
 ## Como funciona el acceso
 
@@ -14,8 +14,8 @@ Tres condiciones deben cumplirse. Si falta cualquiera, no se ve nada:
 3. **Rol.** `ADMIN`, `COMERCIAL` o `LECTURA`.
 
 La consola nunca usa la clave privilegiada de Supabase. Lee con la sesion del
-usuario y RLS decide. `npm run check:privilegios` falla si esa clave aparece en
-el codigo.
+usuario; RLS y las funciones auditadas deciden que se ve y que se puede cambiar.
+`npm run check:privilegios` falla si esa clave aparece en el codigo.
 
 ### Que ve cada rol hoy
 
@@ -23,10 +23,16 @@ el codigo.
 |---|:--:|:--:|:--:|
 | Resumen, organizaciones, proveedores, tecnicas, importaciones | si | si | si |
 | Correos completos en la ficha de organizacion | enmascarados | enmascarados | completos |
-| Escribir cualquier cosa | no | no | no |
+| Costos del catalogo propio | no | no | si |
+| Resolver items de revision | no | si | si |
+| Marcar prospecto/cliente y prioridad | no | si | si |
+| Clasificar tipo normalizado de organizacion | no | si | si |
+| Emitir cotizaciones con snapshot | no | si | si |
+| Escritura directa en tablas desde la app | no | no | no |
 
-En la Etapa B nadie escribe. Resolver items de revision sera la unica excepcion
-y llega con su registro de auditoria.
+Las escrituras permitidas no abren permisos directos sobre tablas. Pasan por
+funciones `SECURITY DEFINER` que validan `perfil_usuario` y dejan auditoria o
+snapshot, segun corresponda.
 
 ## Crear el primer usuario
 
@@ -68,7 +74,7 @@ impone RLS en PostgreSQL, no el secreto de la clave.
 ```bash
 cd web && npm run verificar          # tipos y compilacion, sin tocar el dev
 cd web && npm run check:privilegios  # la clave privilegiada no esta en el codigo
-./scripts/run_db_tests.ps1           # incluye test_console_access.sql
+./scripts/run_db_tests.ps1           # incluye test_console_access.sql y test_console_actions.sql
 python scripts/audit_change.py --all # invariantes del repositorio
 ```
 
@@ -76,6 +82,11 @@ python scripts/audit_change.py --all # invariantes del repositorio
 sin perfil no ve nada, que ninguna escritura pasa, que las seis tablas con datos
 personales son inaccesibles, y que `LECTURA` recibe el correo enmascarado
 mientras `ADMIN` lo ve completo.
+
+`test_console_actions.sql` verifica que `LECTURA` no ejecute acciones, que
+`COMERCIAL` pueda resolver revisiones y actualizar estado comercial, que `ADMIN`
+pueda clasificar tipos, y que `resolve_price()` siga cerrado para ejecucion
+directa desde `authenticated`.
 
 ## Si la consola pierde los estilos
 
@@ -99,7 +110,8 @@ npm run dev
 Casi siempre es una de estas tres, en este orden:
 
 1. No hay fila en `perfil_usuario`, o tiene `activo = false`.
-2. La migracion `024_console_access.sql` no esta aplicada en el entorno.
+2. Las migraciones de consola, desde `024_console_access.sql`, no estan aplicadas
+   en el entorno.
 3. `.env.local` apunta a otro proyecto de Supabase.
 
 Una consola vacia rara vez significa que falten permisos de clave. Si una

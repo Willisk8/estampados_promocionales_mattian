@@ -15,6 +15,10 @@ type Fila = {
   nombre_legal: string;
   nombre_comercial: string | null;
   tipo_entidad_origen: string | null;
+  tipo_codigo: string | null;
+  tipo_descripcion: string | null;
+  estado_comercial: string;
+  prioridad_comercial: string;
   departamento: string | null;
   municipio: string | null;
   estado: string;
@@ -121,8 +125,8 @@ export default async function PaginaOrganizaciones({
     <>
       <h1>Organizaciones</h1>
       <p className="subtitulo">
-        Base comercial de prospectos del sector solidario. Todavia no hay estado
-        prospecto/cliente: eso llega en la Etapa C.
+        Base comercial de prospectos y clientes. El tipo normalizado y el estado
+        comercial se manejan separados del dato oficial de origen.
       </p>
 
       <form className="filtros" method="get">
@@ -178,7 +182,8 @@ export default async function PaginaOrganizaciones({
             <tr>
               <th>Nombre legal</th>
               <th>NIT</th>
-              <th>Tipo de origen</th>
+              <th>Tipo</th>
+              <th>Estado comercial</th>
               <th>Ciudad</th>
               <th>Ultimo reporte</th>
               <th className="num">Correos</th>
@@ -196,7 +201,30 @@ export default async function PaginaOrganizaciones({
                   </Link>
                 </td>
                 <td>{f.nit ?? "—"}</td>
-                <td>{f.tipo_entidad_origen ?? "—"}</td>
+                <td>
+                  {f.tipo_codigo ? (
+                    <span title={f.tipo_entidad_origen ?? undefined}>
+                      {f.tipo_codigo}
+                    </span>
+                  ) : (
+                    <span className="insignia aviso">pendiente</span>
+                  )}
+                </td>
+                <td>
+                  <span
+                    className={
+                      f.estado_comercial === "CLIENTE" ? "insignia" : "insignia neutra"
+                    }
+                  >
+                    {f.estado_comercial}
+                  </span>
+                  {f.prioridad_comercial === "ALTA" && (
+                    <>
+                      {" "}
+                      <span className="insignia aviso">ALTA</span>
+                    </>
+                  )}
+                </td>
                 <td>
                   {f.municipio ?? "—"}
                   {f.departamento && (
@@ -220,7 +248,7 @@ export default async function PaginaOrganizaciones({
             ))}
             {filas.length === 0 && (
               <tr>
-                <td colSpan={9} style={{ color: "var(--texto-suave)" }}>
+                <td colSpan={10} style={{ color: "var(--texto-suave)" }}>
                   Ninguna organizacion coincide con el filtro.
                 </td>
               </tr>

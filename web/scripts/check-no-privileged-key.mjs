@@ -1,10 +1,10 @@
 /**
  * Falla si la clave privilegiada de Supabase aparece en el codigo de la consola.
  *
- * La Etapa B es de solo lectura y usa la sesion del usuario: RLS decide que se
- * ve. Si una consulta parece necesitar mas permisos, el error esta en la
- * politica, no aqui. Esta comprobacion existe para que esa decision no se
- * erosione por conveniencia en un momento de apuro.
+ * La consola usa la sesion del usuario: RLS y las RPC auditadas deciden que se
+ * ve y que se puede cambiar. Si una consulta parece necesitar mas permisos, el
+ * error esta en la politica, no aqui. Esta comprobacion existe para que esa
+ * decision no se erosione por conveniencia en un momento de apuro.
  *
  * El termino buscado se arma por partes a proposito, para que este archivo no
  * se delate a si mismo ni a la auditoria del repositorio.

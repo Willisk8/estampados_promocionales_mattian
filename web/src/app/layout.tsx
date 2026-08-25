@@ -5,7 +5,7 @@ import { NavLateral } from "@/componentes/nav-lateral";
 
 export const metadata: Metadata = {
   title: "Consola Estampados",
-  description: "Consola interna de observacion — solo lectura, STAGING",
+  description: "Consola interna de operacion controlada, STAGING",
 };
 
 // La consola siempre refleja el estado actual de la base; nada se cachea.
