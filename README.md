@@ -262,6 +262,14 @@ python scripts/catalog/pricing_model.py scripts/catalog/example_quote_inputs.jso
 
 El modelo viene de la calculadora local `cotizador-v2.html` y contempla costo proveedor, personalización, empaque, gastos por pedido, desgaste de máquinas, retenciones y margen/markup.
 
+Para generar SQL revisable del catálogo propio MVP:
+
+```powershell
+python scripts/catalog/generate_catalog_seed.py scripts/catalog/mvp_catalog_inputs.json > outputs/mvp_catalog_seed.sql
+```
+
+Los productos generados quedan en `DRAFT`; no serán cotizables por `resolve_price()` hasta que se activen explícitamente.
+
 Documento: [`docs/catalogo_propio_mvp.md`](docs/catalogo_propio_mvp.md)
 
 ---

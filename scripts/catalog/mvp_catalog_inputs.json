@@ -1,0 +1,163 @@
+{
+  "valid_from": "2026-09-01T00:00:00+00:00",
+  "valid_to": "2026-12-31T23:59:59+00:00",
+  "products": [
+    {
+      "product": {
+        "sku": "PRD-MUG-11OZ",
+        "name": "Mug sublimable 11 oz",
+        "category": "Mugs",
+        "description": "Producto MVP pendiente de confirmacion comercial.",
+        "variant_sku": "PRD-MUG-11OZ-BLANCO",
+        "variant_name": "11 oz blanco ceramica",
+        "attributes": {
+          "capacidad_oz": 11,
+          "color": "blanco",
+          "material": "ceramica",
+          "tecnica_personalizacion": "sublimacion"
+        }
+      },
+      "supplier_product_ids": [],
+      "quantity_breaks": [1, 12, 50, 100, 200],
+      "cost_reference_quantity": 100,
+      "product_costs": [
+        {"name": "Costo proveedor mug", "value_unit": 6200},
+        {"name": "Mano de obra", "value_unit": 800},
+        {"name": "Empaque", "value_unit": 500}
+      ],
+      "order_costs": [
+        {"name": "Transporte proveedor", "value_total": 15000}
+      ],
+      "machines": [
+        {"name": "Impresora sublimacion", "replacement_value": 3000000, "estimated_uses": 600},
+        {"name": "Plancha mug", "replacement_value": 800000, "estimated_uses": 1500}
+      ],
+      "marking": {
+        "mode": "sublimacion_mug",
+        "paper_package_100_sheets": 39500,
+        "images_per_sheet": 3,
+        "ink_set_cost": 140000,
+        "ink_yield_sheets": 800,
+        "watts": 280,
+        "seconds": 32,
+        "passes": 2,
+        "kwh_price": 900
+      },
+      "withholdings": {
+        "reteica_pct": 1.104,
+        "retefuente_pct": 2.5,
+        "reteiva_pct": 0,
+        "other_pct": 0
+      },
+      "commercial_policy": {
+        "mode": "margen",
+        "target_pct": 40
+      }
+    },
+    {
+      "product": {
+        "sku": "PRD-CAMI-BASICA",
+        "name": "Camiseta personalizada",
+        "category": "Textiles",
+        "description": "Producto MVP pendiente de confirmacion comercial.",
+        "variant_sku": "PRD-CAMI-BASICA-DTF",
+        "variant_name": "Camiseta basica estampado DTF",
+        "attributes": {
+          "material": "algodon",
+          "color": "por_definir",
+          "tecnica_personalizacion": "dtf"
+        }
+      },
+      "supplier_product_ids": [],
+      "quantity_breaks": [1, 12, 50, 100, 200],
+      "cost_reference_quantity": 100,
+      "product_costs": [
+        {"name": "Costo proveedor camiseta", "value_unit": 15000},
+        {"name": "Mano de obra", "value_unit": 1200},
+        {"name": "Empaque", "value_unit": 700}
+      ],
+      "order_costs": [
+        {"name": "Transporte proveedor", "value_total": 15000}
+      ],
+      "machines": [
+        {"name": "Plotter", "replacement_value": 2500000, "estimated_uses": 500},
+        {"name": "Plancha calor DTF", "replacement_value": 800000, "estimated_uses": 1500}
+      ],
+      "marking": {
+        "mode": "dtf",
+        "price_per_meter": 12000,
+        "roll_width_cm": 58,
+        "waste_pct": 10,
+        "designs": [
+          {"name": "Pecho", "width_cm": 10, "height_cm": 12, "units_per_product": 1},
+          {"name": "Espalda", "width_cm": 25, "height_cm": 30, "units_per_product": 1}
+        ],
+        "iron": {
+          "include": false,
+          "watts": 2000,
+          "seconds": 160,
+          "passes": 2,
+          "kwh_price": 900
+        }
+      },
+      "withholdings": {
+        "reteica_pct": 1.104,
+        "retefuente_pct": 2.5,
+        "reteiva_pct": 0,
+        "other_pct": 0
+      },
+      "commercial_policy": {
+        "mode": "margen",
+        "target_pct": 40
+      }
+    },
+    {
+      "product": {
+        "sku": "PRD-TERMO-BASICO",
+        "name": "Termo personalizado",
+        "category": "Termos",
+        "description": "Producto MVP pendiente de confirmacion comercial.",
+        "variant_sku": "PRD-TERMO-BASICO-DTFUV",
+        "variant_name": "Termo con DTF-UV",
+        "attributes": {
+          "material": "acero_plastico_por_definir",
+          "color": "por_definir",
+          "tecnica_personalizacion": "dtf_uv"
+        }
+      },
+      "supplier_product_ids": [],
+      "quantity_breaks": [1, 12, 50, 100, 200],
+      "cost_reference_quantity": 100,
+      "product_costs": [
+        {"name": "Costo proveedor termo", "value_unit": 18000},
+        {"name": "Mano de obra", "value_unit": 1000},
+        {"name": "Empaque", "value_unit": 1000}
+      ],
+      "order_costs": [
+        {"name": "Transporte proveedor", "value_total": 15000}
+      ],
+      "machines": [
+        {"name": "Plancha calor DTF", "replacement_value": 800000, "estimated_uses": 1500}
+      ],
+      "marking": {
+        "mode": "dtf_uv",
+        "price_per_meter": 30000,
+        "roll_width_cm": 57,
+        "width_cm": 8,
+        "height_cm": 10,
+        "waste_pct": 10,
+        "transport_total": 0
+      },
+      "withholdings": {
+        "reteica_pct": 1.104,
+        "retefuente_pct": 2.5,
+        "reteiva_pct": 0,
+        "other_pct": 0
+      },
+      "commercial_policy": {
+        "mode": "margen",
+        "target_pct": 40
+      }
+    }
+  ]
+}

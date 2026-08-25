@@ -79,6 +79,16 @@ El script imprime:
 qty,costo_unitario,precio_unitario,recibido_unitario,ganancia_unitaria,margen_real_pct,markup_real_pct
 ```
 
+Para generar SQL revisable:
+
+```powershell
+python scripts/catalog/generate_catalog_seed.py scripts/catalog/mvp_catalog_inputs.json > outputs/mvp_catalog_seed.sql
+```
+
+El SQL deja `producto` y `variante_producto` en `DRAFT`. Esto es intencional: `resolve_price()` solo cotiza productos `ACTIVE`.
+
+Limitacion actual: `costo_producto` no tiene rango por cantidad. Por eso el generador guarda un costo de referencia (`cost_reference_quantity`) y los precios comerciales por escala quedan en `precio_producto.quantity_range`.
+
 ## Proximo paso operativo
 
 No cargar 935 productos al catalogo propio. Para cerrar el MVP comercial, seleccionar 3-5 productos reales:
