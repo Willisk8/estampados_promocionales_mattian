@@ -103,10 +103,14 @@ def marking_cost_unit(config: dict[str, Any], quantity: int) -> float:
 def calculate_price(config: dict[str, Any], quantity: int) -> PriceResult:
     product_costs = sum(float(c.get("value_unit", 0)) for c in config.get("product_costs", []))
     order_costs_unit = sum(float(c.get("value_total", 0)) for c in config.get("order_costs", [])) / quantity
-    machine_costs_unit = sum(
-        float(m.get("replacement_value", 0)) / max(float(m.get("estimated_uses", 1)), 1)
-        for m in config.get("machines", [])
-    ) / quantity
+    machine_wear_policy = config.get("machine_wear_policy", {})
+    skip_machine_wear = machine_wear_policy.get("skip_for_single_unit", False) and quantity == 1
+    machine_costs_unit = 0.0
+    if not skip_machine_wear:
+        machine_costs_unit = sum(
+            float(m.get("replacement_value", 0)) / max(float(m.get("estimated_uses", 1)), 1)
+            for m in config.get("machines", [])
+        ) / quantity
     marking = marking_cost_unit(config.get("marking", {}), quantity)
 
     total_cost = product_costs + marking + order_costs_unit + machine_costs_unit

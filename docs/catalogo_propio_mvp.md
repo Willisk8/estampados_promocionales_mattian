@@ -55,6 +55,7 @@ precio_unitario =
 | Marcacion | Bordado, DTF, sublimacion, DTF-UV | `costo_personalizacion` + `atributos` de variante |
 | Margen objetivo | Margen sobre venta o markup | metadata/documentacion de precio |
 | Retenciones | ReteICA, ReteFuente, ReteIVA, otra | metadata/documentacion de precio |
+| Desgaste maquinas | Reposicion / usos estimados | Se prorratea por cantidad; para 1 unidad puede omitirse con `machine_wear_policy.skip_for_single_unit` |
 
 ## Tecnicas soportadas por la calculadora
 
@@ -88,6 +89,8 @@ python scripts/catalog/generate_catalog_seed.py scripts/catalog/mvp_catalog_inpu
 El SQL deja `producto` y `variante_producto` en `DRAFT`. Esto es intencional: `resolve_price()` solo cotiza productos `ACTIVE`.
 
 Limitacion actual: `costo_producto` no tiene rango por cantidad. Por eso el generador guarda un costo de referencia (`cost_reference_quantity`) y los precios comerciales por escala quedan en `precio_producto.quantity_range`.
+
+Regla comercial actual: para pedidos de 1 unidad no se carga desgaste de maquinas. Por eso las escalas MVP separan `[1,2)` de `[2,12)`.
 
 ## Proximo paso operativo
 
