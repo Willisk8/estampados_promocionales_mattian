@@ -4,7 +4,7 @@
 -- No activa campanas ni cambia contactabilidad.
 -- ============================================================
 
-CREATE OR REPLACE VIEW vw_organizacion_contacto_resumen AS
+CREATE OR REPLACE VIEW vw_organizacion_contacto_resumen WITH (security_invoker = on) AS
 WITH contactabilidad_actual AS (
     SELECT DISTINCT ON (id_canal_contacto)
         id_canal_contacto,
@@ -59,7 +59,7 @@ GROUP BY
     o.municipio,
     o.estado;
 
-CREATE OR REPLACE VIEW vw_import_review_open AS
+CREATE OR REPLACE VIEW vw_import_review_open WITH (security_invoker = on) AS
 SELECT
     iri.id_import_review_item,
     iri.severity,
@@ -85,7 +85,7 @@ JOIN import_batch ib
   ON ib.id_import_batch = irr.id_import_batch
 WHERE iri.resolution_status = 'OPEN';
 
-CREATE OR REPLACE VIEW vw_catalogo_proveedor_quality AS
+CREATE OR REPLACE VIEW vw_catalogo_proveedor_quality WITH (security_invoker = on) AS
 SELECT
     p.id_proveedor,
     p.source_id,
@@ -116,7 +116,7 @@ GROUP BY
     p.ciudad,
     p.activo;
 
-CREATE OR REPLACE VIEW vw_campaign_eligibility_queue AS
+CREATE OR REPLACE VIEW vw_campaign_eligibility_queue WITH (security_invoker = on) AS
 SELECT
     cc.id_canal_contacto,
     cc.id_organizacion,

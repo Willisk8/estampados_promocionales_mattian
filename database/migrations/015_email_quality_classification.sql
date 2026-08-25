@@ -10,7 +10,7 @@
 -- - malformado en cuarentena.
 -- ============================================================
 
-CREATE OR REPLACE VIEW vw_email_quality_classification AS
+CREATE OR REPLACE VIEW vw_email_quality_classification WITH (security_invoker = on) AS
 WITH email_base AS (
     SELECT
         cc.id_canal_contacto,
