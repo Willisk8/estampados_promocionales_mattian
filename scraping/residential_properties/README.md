@@ -31,6 +31,25 @@ python scraper.py run --user-agent "EstampadosData/1.0 (correo@dominio.co)"
 python scraper.py verify
 ```
 
+Auditoría alcaldía por alcaldía, cruzando DIVIPOLA, SUIT y las bases integradas:
+
+```powershell
+python coverage.py --user-agent "EstampadosData/1.0 (correo@dominio.co)"
+```
+
+Enriquecimiento de contactos desde dominios publicados en las fuentes oficiales:
+
+```powershell
+python enrich.py crawl --user-agent "EstampadosData/1.0 (correo@dominio.co)"
+python enrich.py verify
+```
+
+El enriquecedor respeta `robots.txt`, limita páginas y solicitudes por dominio,
+no usa buscadores masivos ni evade CAPTCHA. Una página solo alimenta el contacto
+consolidado cuando coincide por NIT, nombre, dirección o por una asociación
+manual documentada. Las páginas de constructoras o empresas administradoras se
+marcan para revisión de rol y no reemplazan automáticamente el contacto oficial.
+
 Para probar una sola fuente:
 
 ```powershell
@@ -46,6 +65,16 @@ python scraper.py run --sources a9yz-vh6j
 - `outputs/propiedades_horizontales_colombia.jsonl`: salida auditable por fila.
 - `outputs/resumen.json`: cobertura, fechas y completitud por municipio.
 - `outputs/errores.csv`: fuentes que fallaron sin detener las demás.
+- `outputs/cobertura_municipios_colombia.csv`: estado de los 1.122 territorios
+  DIVIPOLA frente a bases abiertas y trámites SUIT.
+- `outputs/tramites_alcaldias_propiedad_horizontal.csv`: trámites territoriales
+  localizados para registro, representación o certificación.
+- `outputs/municipios_pendientes_fuente_abierta.csv`: cola de alcaldías sin base
+  abierta integrada.
+- `outputs/enrichment/conjuntos_residenciales_enriquecidos.csv`: base residencial
+  con correos, teléfonos, WhatsApp, sitio y nivel de confianza.
+- `outputs/enrichment/evidencia_contactos_web.csv`: evidencia completa, incluida
+  la no verificada, siempre con URL y fecha.
 
 Cada registro conserva URL, ID de fuente, fecha de la fuente y fecha de
 consulta. Se guardan únicamente correos y teléfonos publicados por la entidad
@@ -65,3 +94,9 @@ Antes de usar un representante para una gestión sensible, obtenga o consulte el
 certificado vigente ante la alcaldía competente. Para contacto comercial, use
 preferentemente buzones institucionales y documente la base jurídica, la
 finalidad, la política de tratamiento y el mecanismo de exclusión.
+
+## Cómo ampliar sitios confirmados
+
+Copie `manual_websites.example.csv` como `manual_websites.csv` y agregue el
+`record_id`, sitio y URL pública que confirma la asociación. El archivo manual no
+debe incluir cédulas ni información de residentes.
