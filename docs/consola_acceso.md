@@ -66,7 +66,7 @@ impone RLS en PostgreSQL, no el secreto de la clave.
 ## Comprobaciones
 
 ```bash
-cd web && npm run build              # tipos y compilacion
+cd web && npm run verificar          # tipos y compilacion, sin tocar el dev
 cd web && npm run check:privilegios  # la clave privilegiada no esta en el codigo
 ./scripts/run_db_tests.ps1           # incluye test_console_access.sql
 python scripts/audit_change.py --all # invariantes del repositorio
@@ -76,6 +76,23 @@ python scripts/audit_change.py --all # invariantes del repositorio
 sin perfil no ve nada, que ninguna escritura pasa, que las seis tablas con datos
 personales son inaccesibles, y que `LECTURA` recibe el correo enmascarado
 mientras `ADMIN` lo ve completo.
+
+## Si la consola pierde los estilos
+
+Sintoma: los datos cargan pero la pagina sale sin ningun formato, con tipografia
+de navegador. Causa: se corrio `npm run build` mientras `npm run dev` estaba
+vivo, y el build de produccion sobrescribio el `.next` que el servidor de
+desarrollo estaba usando; las rutas de CSS que la pagina pide dejan de existir y
+devuelven 404.
+
+Por eso existe `npm run verificar`, que compila en `.next-verificacion` y no toca
+el directorio del servidor de desarrollo. Si ya ocurrio:
+
+```bash
+cd web
+rm -rf .next
+npm run dev
+```
 
 ## Si la consola aparece vacia
 

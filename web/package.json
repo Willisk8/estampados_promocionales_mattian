@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "check:privilegios": "node scripts/check-no-privileged-key.mjs"
+    "check:privilegios": "node scripts/check-no-privileged-key.mjs",
+    "verificar": "node -e \"process.env.NEXT_DIST_DIR='.next-verificacion';require('child_process').execSync('npx next build',{stdio:'inherit',env:process.env})\""
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
