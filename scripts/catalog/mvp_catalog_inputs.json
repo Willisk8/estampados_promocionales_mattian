@@ -21,7 +21,7 @@
       "quantity_breaks": [1, 2, 12, 50, 100, 200],
       "cost_reference_quantity": 100,
       "machine_wear_policy": {
-        "skip_for_single_unit": true
+        "min_amortization_qty": 12
       },
       "product_costs": [
         {"name": "Costo proveedor mug", "value_unit": 6200},
@@ -29,7 +29,7 @@
         {"name": "Empaque", "value_unit": 500}
       ],
       "order_costs": [
-        {"name": "Transporte proveedor", "value_total": 15000}
+        {"name": "Transporte proveedor", "value_total": 15000, "billing": "separate"}
       ],
       "machines": [
         {"name": "Impresora sublimacion", "replacement_value": 3000000, "estimated_uses": 600},
@@ -75,7 +75,7 @@
       "quantity_breaks": [1, 2, 12, 50, 100, 200],
       "cost_reference_quantity": 100,
       "machine_wear_policy": {
-        "skip_for_single_unit": true
+        "min_amortization_qty": 12
       },
       "product_costs": [
         {"name": "Costo proveedor camiseta", "value_unit": 15000},
@@ -83,7 +83,7 @@
         {"name": "Empaque", "value_unit": 700}
       ],
       "order_costs": [
-        {"name": "Transporte proveedor", "value_total": 15000}
+        {"name": "Transporte proveedor", "value_total": 15000, "billing": "separate"}
       ],
       "machines": [
         {"name": "Plotter", "replacement_value": 2500000, "estimated_uses": 500},
@@ -135,7 +135,7 @@
       "quantity_breaks": [1, 2, 12, 50, 100, 200],
       "cost_reference_quantity": 100,
       "machine_wear_policy": {
-        "skip_for_single_unit": true
+        "min_amortization_qty": 12
       },
       "product_costs": [
         {"name": "Costo proveedor termo", "value_unit": 18000},
@@ -143,7 +143,7 @@
         {"name": "Empaque", "value_unit": 1000}
       ],
       "order_costs": [
-        {"name": "Transporte proveedor", "value_total": 15000}
+        {"name": "Transporte proveedor", "value_total": 15000, "billing": "separate"}
       ],
       "machines": [
         {"name": "Plancha calor DTF", "replacement_value": 800000, "estimated_uses": 1500}

@@ -100,17 +100,33 @@ def marking_cost_unit(config: dict[str, Any], quantity: int) -> float:
     raise ValueError(f"Unsupported marking mode: {mode}")
 
 
+def shipping_cost_unit(config: dict[str, Any], quantity: int) -> float:
+    """Costos de envio/transporte — se cobran por separado, no van en precio_producto."""
+    return sum(
+        float(c.get("value_total", 0))
+        for c in config.get("order_costs", [])
+        if c.get("billing") == "separate"
+    ) / quantity
+
+
 def calculate_price(config: dict[str, Any], quantity: int) -> PriceResult:
     product_costs = sum(float(c.get("value_unit", 0)) for c in config.get("product_costs", []))
-    order_costs_unit = sum(float(c.get("value_total", 0)) for c in config.get("order_costs", [])) / quantity
+    # Solo incluir order_costs sin billing=separate en el precio unitario
+    order_costs_unit = sum(
+        float(c.get("value_total", 0))
+        for c in config.get("order_costs", [])
+        if c.get("billing") != "separate"
+    ) / quantity
     machine_wear_policy = config.get("machine_wear_policy", {})
-    skip_machine_wear = machine_wear_policy.get("skip_for_single_unit", False) and quantity == 1
-    machine_costs_unit = 0.0
-    if not skip_machine_wear:
-        machine_costs_unit = sum(
-            float(m.get("replacement_value", 0)) / max(float(m.get("estimated_uses", 1)), 1)
-            for m in config.get("machines", [])
-        ) / quantity
+    # min_amortization_qty: denominador minimo para amortizar desgaste.
+    # Para qty < min, el costo por unidad equivale al de min unidades.
+    # Evita inversiones de precio (qty=2 mas caro que qty=1).
+    min_amort = int(machine_wear_policy.get("min_amortization_qty", 1))
+    effective_qty = max(quantity, min_amort)
+    machine_costs_unit = sum(
+        float(m.get("replacement_value", 0)) / max(float(m.get("estimated_uses", 1)), 1)
+        for m in config.get("machines", [])
+    ) / effective_qty
     marking = marking_cost_unit(config.get("marking", {}), quantity)
 
     total_cost = product_costs + marking + order_costs_unit + machine_costs_unit

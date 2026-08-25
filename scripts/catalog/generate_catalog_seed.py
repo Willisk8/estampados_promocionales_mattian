@@ -157,6 +157,8 @@ def main(path: str) -> None:
     print("-- ============================================================")
     print("-- Catalogo propio MVP generado. Revisar antes de aplicar.")
     print("-- Productos quedan en DRAFT: resolve_price no los cotiza hasta estado ACTIVE.")
+    print("-- Transporte (billing=separate) NO incluido en precio_producto.")
+    print("-- Cobrar envio como cargo independiente en la cotizacion al cliente.")
     print("-- ============================================================")
     print("BEGIN;")
     print("")
