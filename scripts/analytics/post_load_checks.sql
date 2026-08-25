@@ -113,4 +113,15 @@ FROM vw_catalogo_proveedor_quality
 UNION ALL
 SELECT 'vw_campaign_eligibility_queue', COUNT(*)
 FROM vw_campaign_eligibility_queue
+UNION ALL
+SELECT 'vw_email_quality_classification', COUNT(*)
+FROM vw_email_quality_classification
 ORDER BY vista;
+
+-- Clasificacion fina de emails para segmentacion pre-piloto
+SELECT
+    email_segmento,
+    COUNT(*) AS emails
+FROM vw_email_quality_classification
+GROUP BY email_segmento
+ORDER BY emails DESC;

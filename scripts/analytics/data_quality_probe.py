@@ -149,27 +149,55 @@ QUERIES = {
     """,
 
     "clasificacion_email": """
-        SELECT
+        WITH base AS (
+            SELECT
+                LOWER(SPLIT_PART(valor_normalizado, '@', 1)) AS local_part,
+                LOWER(SPLIT_PART(valor_normalizado, '@', 2)) AS domain
+            FROM canal_contacto
+            WHERE tipo = 'EMAIL'
+              AND valor_normalizado IS NOT NULL
+              AND valor_normalizado LIKE '%@%'
+        ),
+        classified AS (
+            SELECT
             CASE
-                WHEN LOWER(SPLIT_PART(valor_normalizado, '@', 2)) IN (
+                WHEN domain IN (
+                    'coomservi.combogot',
+                    'colegiocoomeva.edu.codocente',
+                    'fbcsena.comauxiliar'
+                ) THEN 'malformado_cuarentena'
+                WHEN domain IN (
                     'gmail.com','hotmail.com','yahoo.com','outlook.com',
                     'live.com','icloud.com','hotmail.es','yahoo.es',
                     'gmail.es','aol.com','msn.com','me.com'
-                ) THEN 'personal'
-                WHEN LOWER(SPLIT_PART(valor_normalizado, '@', 1)) ~
+                )
+                AND local_part ~
+                    '(^|[._-])(info|contacto|contact|admin|administracion|gerencia|secretaria|'
+                    'contabilidad|compras|ventas|comercial|director|presidencia|'
+                    'tesorero|tesoreria|cartera|servicio|servicios|atencion|soporte|'
+                    'correspondencia|comunicaciones|recursos|fondo|fondos|empleados|'
+                    'cooperativa|coop)([._-]|$)'
+                THEN 'rol_entidad_dominio_gratuito'
+                WHEN domain IN (
+                    'gmail.com','hotmail.com','yahoo.com','outlook.com',
+                    'live.com','icloud.com','hotmail.es','yahoo.es',
+                    'gmail.es','aol.com','msn.com','me.com'
+                ) THEN 'personal_probable'
+                WHEN local_part ~
                     '^(info|contacto|contact|admin|administracion|gerencia|secretaria|'
                     'contabilidad|compras|ventas|comercial|director|presidencia|'
-                    'tesoreria|cartera|servicio|servicios|atencion|soporte|'
+                    'tesorero|tesoreria|cartera|servicio|servicios|atencion|soporte|'
                     'correspondencia|comunicaciones|recursos)$'
-                THEN 'rol'
-                ELSE 'corporativo'
-            END AS tipo_email,
+                THEN 'rol_dominio_propio'
+                ELSE 'corporativo_dominio_propio'
+            END AS tipo_email
+            FROM base
+        )
+        SELECT
+            tipo_email,
             COUNT(*)                                              AS n,
             ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2)  AS pct
-        FROM canal_contacto
-        WHERE tipo = 'EMAIL'
-          AND valor_normalizado IS NOT NULL
-          AND valor_normalizado LIKE '%@%'
+        FROM classified
         GROUP BY tipo_email
         ORDER BY n DESC
     """,

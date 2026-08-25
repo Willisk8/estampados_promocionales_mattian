@@ -21,6 +21,7 @@ Aplicar en orden numérico estricto. Cada migración depende de las anteriores.
 | `012_revoke_public_execute.sql` | Revoca EXECUTE a PUBLIC en funciones SECURITY DEFINER |
 | `013_operational_views.sql` | Vistas operativas para CRM, revisión de importación, calidad de catálogo y elegibilidad |
 | `014_quarantine_malformed_email_domains.sql` | Marca 58 emails con dominios malformados como `REVIEW_REQUIRED` y abre revisión trazable |
+| `015_email_quality_classification.sql` | Vista de clasificación fina de emails: dominio propio, rol, gratuito operativo, personal probable y cuarentena |
 
 ## Cómo aplicar en Supabase Staging
 

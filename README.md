@@ -9,12 +9,12 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 | Componente | Estado | Detalle |
 |---|---|---|
 | Infraestructura Supabase STAGING | ✓ Completo | Proyecto `psereyjwjpyakkmnabgm`, región us-west-2 Oregon |
-| Migraciones `000`–`014` | ✓ Aplicadas | 15 migraciones en STAGING |
+| Migraciones `000`–`015` | ✓ Aplicadas | 16 migraciones en STAGING |
 | Motor de precios (`resolve_price`) | ✓ Operativo | Tests A–F pasando |
 | CRM — organizaciones y personas | ✓ Cargado | 5,639 organizaciones · 4,642 personas |
 | CRM — canales de contacto | ✓ Cargado | 16,211 canales (email, teléfono, WhatsApp, web) |
 | Catálogo proveedores | ✓ Cargado | 7 proveedores · 935 productos · 934 snapshots de precio |
-| Vistas operativas | ✓ Activas | Migración `013` |
+| Vistas operativas | ✓ Activas | Migraciones `013` y `015` |
 | Cuarentena emails malformados | ✓ Aplicada | Migración `014` — 58 canales `REVIEW_REQUIRED` |
 | Calidad de datos | ✓ Score 87/100 | Reporte en `docs/data_quality_report.md` |
 | Gates pre-piloto | ⚠ Pendiente | Ver `docs/pre_pilot_gates.md` |
@@ -29,7 +29,7 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 ```
 estampados/
 ├── database/
-│   ├── migrations/          # Migraciones SQL numeradas (000–014)
+│   ├── migrations/          # Migraciones SQL numeradas (000–015)
 │   ├── tests/               # Tests de precio y CRM/contactabilidad
 │   └── documentation/
 │       └── migrations-guide.md
@@ -130,6 +130,7 @@ El script aplica solo las migraciones que no están registradas en `schema_migra
 | `012_revoke_public_execute.sql` | Revoca EXECUTE a PUBLIC en funciones críticas |
 | `013_operational_views.sql` | Vistas: CRM, revisión de importación, calidad de catálogo, elegibilidad |
 | `014_quarantine_malformed_email_domains.sql` | Cuarentena de 58 emails con dominios malformados por concatenación |
+| `015_email_quality_classification.sql` | Clasificación fina de emails para segmentación pre-piloto |
 
 ### Convenciones obligatorias
 
@@ -263,7 +264,7 @@ Hallazgos principales:
 
 - NIT 100% completo — deduplicación confiable
 - Cobertura email por org: 99.8% — todos con hash HMAC-SHA256
-- 47.4% de emails son personales (gmail/hotmail/yahoo) — riesgo de rotación anual
+- 45.9% de emails son personales probables; 1.5% son rol/entidad en dominio gratuito
 - 58 emails con dominios malformados en cuarentena (`REVIEW_REQUIRED`) — 58 ítems HIGH abiertos
 - 824 ítems MEDIUM abiertos de revisión de organizaciones
 - `estado_calidad` catálogo: 934 `VALID`, 1 `NEEDS_REVIEW`

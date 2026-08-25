@@ -26,8 +26,11 @@ Segmentacion minima antes de cualquier activacion:
 |---|---|---|
 | Email corporativo de dominio institucional | Dominio no personal y no rol generico | Revision legal + posible contacto B2B controlado si existe base defendible |
 | Email de rol | Local-part tipo `info@`, `compras@`, `gerencia@`, `contacto@` | Prioritario para revision porque suele representar canal organizacional |
+| Rol/entidad en dominio gratuito | Ej. `compras.fondo@gmail.com`, `tesorero.fondoabc@yahoo.com` | No tratar como personal puro; requiere revision legal y validacion de buzon |
 | Email personal | Dominios como `gmail.com`, `hotmail.com`, `yahoo.com`, `outlook.com` | No incluir en marketing sin consentimiento o base legal documentada |
 | Email malformado | Dominios en cuarentena | Corregir manualmente o marcar `INVALID` |
+
+Vista operativa: `vw_email_quality_classification`.
 
 La vista `vw_campaign_eligibility_queue` debe seguir devolviendo `eligible = false` hasta que exista una base valida y auditable.
 

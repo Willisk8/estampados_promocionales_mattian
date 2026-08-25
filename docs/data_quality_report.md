@@ -2,7 +2,7 @@
 
 Fecha de corte: 2026-08-25
 
-Base evaluada: Supabase STAGING, migraciones `000` a `014`, cargas piloto y full de entidades/catalogo.
+Base evaluada: Supabase STAGING, migraciones `000` a `015`, cargas piloto y full de entidades/catalogo.
 
 ## Veredicto ejecutivo
 
@@ -69,9 +69,11 @@ Cobertura por organizacion:
 
 | Clasificacion | Emails | % |
 |---|---:|---:|
-| Personal | 3,491 | 47.36% |
-| Corporativo | 2,879 | 39.06% |
-| Rol | 1,001 | 13.58% |
+| Personal probable | 3,384 | 45.91% |
+| Corporativo con dominio propio | 2,821 | 38.27% |
+| Rol con dominio propio | 1,001 | 13.58% |
+| Rol/entidad en dominio gratuito | 107 | 1.45% |
+| Malformado en cuarentena | 58 | 0.79% |
 
 Formato y seguridad:
 
@@ -85,13 +87,13 @@ Top dominios:
 
 | Dominio | Emails | Nota |
 |---|---:|---|
-| gmail.com | 1,925 | Personal |
-| hotmail.com | 1,207 | Personal |
-| yahoo.es | 169 | Personal |
-| yahoo.com | 115 | Personal |
+| gmail.com | 1,925 | Dominio gratuito: mezclar personal probable y rol/entidad |
+| hotmail.com | 1,207 | Dominio gratuito: mezclar personal probable y rol/entidad |
+| yahoo.es | 169 | Dominio gratuito: mezclar personal probable y rol/entidad |
+| yahoo.com | 115 | Dominio gratuito: mezclar personal probable y rol/entidad |
 | usbmed.edu.co | 72 | Institucional |
 | cooprudea.com | 71 | Corporativo |
-| outlook.com | 58 | Personal |
+| outlook.com | 58 | Dominio gratuito: mezclar personal probable y rol/entidad |
 | coomservi.combogot | 28 | En cuarentena: canal `REVIEW_REQUIRED` |
 | colegiocoomeva.edu.codocente | 19 | En cuarentena: canal `REVIEW_REQUIRED` |
 | fbcsena.comauxiliar | 11 | En cuarentena: canal `REVIEW_REQUIRED` |
@@ -142,7 +144,7 @@ Distribucion de precios:
 
 | Severidad | Hallazgo | Estado |
 |---|---|---|
-| OK | Migraciones `000` a `012` aplicadas en STAGING | Cerrado |
+| OK | Migraciones `000` a `015` aplicadas en STAGING | Cerrado |
 | OK | Cargas piloto y completas separadas por batch | Cerrado |
 | OK | `contactabilidad` tiene paridad 1:1 con `canal_contacto` | Cerrado |
 | OK | `email_hash` calculado para todos los emails | Cerrado |
@@ -151,7 +153,8 @@ Distribucion de precios:
 | OK | 58 emails con dominios malformados marcados `REVIEW_REQUIRED` con trazabilidad raw | Cerrado |
 | Advertencia | 824 items abiertos de revision | Requiere curacion |
 | Advertencia | 58 items HIGH por dominios malformados en cuarentena | Requiere correccion manual o invalidacion |
-| Advertencia | 47.36% de emails son personales | Segmentar antes de contactar |
+| Advertencia | 45.91% de emails son personales probables | No usar en marketing sin consentimiento/base legal documentada |
+| Advertencia | 107 emails son rol/entidad en dominio gratuito | Revisar distinto a personales puros; validar buzon y base legal |
 | Advertencia | 575 websites son candidatos, no necesariamente validacion manual | Mantener confianza separada |
 | Advertencia | `nombre_comercial` tiene 0% de completitud | Definir fuente o dejar fuera del MVP |
 | Advertencia | Dominios malformados detectados por concatenacion | Cuarentena aplicada; falta resolver valores finales |
