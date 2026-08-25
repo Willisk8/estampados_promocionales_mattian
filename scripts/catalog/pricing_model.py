@@ -1,0 +1,171 @@
+"""
+Modelo de costeo/precio basado en cotizador-v2.html.
+
+No escribe en Supabase. Sirve para transformar costos comerciales reales
+en precios unitarios por escala antes de poblar precio_producto.
+
+Uso:
+  python scripts/catalog/pricing_model.py scripts/catalog/example_quote_inputs.json
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+def money(value: float) -> int:
+    return round(value)
+
+
+@dataclass
+class PriceResult:
+    quantity: int
+    total_cost_unit: float
+    sale_price_unit: float
+    received_unit: float
+    profit_unit: float
+    real_margin_pct: float
+    real_markup_pct: float
+
+
+def electricity_cost_unit(watts: float, seconds: float, passes: int, kwh_price: float) -> float:
+    return (watts / 1000.0) * ((seconds * passes) / 3600.0) * kwh_price
+
+
+def marking_cost_unit(config: dict[str, Any], quantity: int) -> float:
+    mode = config.get("mode")
+
+    if mode == "none" or not mode:
+        return 0.0
+
+    if mode == "bordado":
+        fixed = float(config.get("fixed_program_cost", 0))
+        extra = float(config.get("extra_cost_unit", 0))
+        return fixed / quantity + extra
+
+    if mode == "dtf":
+        price_per_meter = float(config.get("price_per_meter", 0))
+        roll_width_cm = float(config.get("roll_width_cm", 58))
+        waste_pct = float(config.get("waste_pct", 0))
+        designs = config.get("designs", [])
+
+        total_area_cm2 = sum(
+            float(d.get("width_cm", 0))
+            * float(d.get("height_cm", 0))
+            * float(d.get("units_per_product", 1))
+            for d in designs
+        )
+        meters_unit = (total_area_cm2 / roll_width_cm / 100.0) * (1 + waste_pct / 100.0)
+        cost = meters_unit * price_per_meter
+
+        iron = config.get("iron")
+        if iron and iron.get("include", False):
+            cost += electricity_cost_unit(
+                float(iron.get("watts", 0)),
+                float(iron.get("seconds", 0)),
+                int(iron.get("passes", 1)),
+                float(iron.get("kwh_price", 0)),
+            )
+        return cost
+
+    if mode == "sublimacion_mug":
+        paper_pkg = float(config.get("paper_package_100_sheets", 0))
+        images_per_sheet = float(config.get("images_per_sheet", 1))
+        ink_set = float(config.get("ink_set_cost", 0))
+        ink_yield_sheets = float(config.get("ink_yield_sheets", 1))
+        paper = paper_pkg / 100.0 / images_per_sheet
+        ink = ink_set / ink_yield_sheets / images_per_sheet
+        elec = electricity_cost_unit(
+            float(config.get("watts", 0)),
+            float(config.get("seconds", 0)),
+            int(config.get("passes", 1)),
+            float(config.get("kwh_price", 0)),
+        )
+        return paper + ink + elec
+
+    if mode == "dtf_uv":
+        price_per_meter = float(config.get("price_per_meter", 0))
+        roll_width_cm = float(config.get("roll_width_cm", 57))
+        width_cm = float(config.get("width_cm", 0))
+        height_cm = float(config.get("height_cm", 0))
+        waste_pct = float(config.get("waste_pct", 0))
+        transport_total = float(config.get("transport_total", 0))
+        meters_unit = (width_cm * height_cm / roll_width_cm / 100.0) * (1 + waste_pct / 100.0)
+        return meters_unit * price_per_meter + transport_total / quantity
+
+    raise ValueError(f"Unsupported marking mode: {mode}")
+
+
+def calculate_price(config: dict[str, Any], quantity: int) -> PriceResult:
+    product_costs = sum(float(c.get("value_unit", 0)) for c in config.get("product_costs", []))
+    order_costs_unit = sum(float(c.get("value_total", 0)) for c in config.get("order_costs", [])) / quantity
+    machine_costs_unit = sum(
+        float(m.get("replacement_value", 0)) / max(float(m.get("estimated_uses", 1)), 1)
+        for m in config.get("machines", [])
+    ) / quantity
+    marking = marking_cost_unit(config.get("marking", {}), quantity)
+
+    total_cost = product_costs + marking + order_costs_unit + machine_costs_unit
+
+    taxes = config.get("withholdings", {})
+    ret_pct = (
+        float(taxes.get("reteica_pct", 0))
+        + float(taxes.get("retefuente_pct", 0))
+        + float(taxes.get("reteiva_pct", 0))
+        + float(taxes.get("other_pct", 0))
+    )
+    ret_factor = 1 - ret_pct / 100.0
+    commercial = config.get("commercial_policy", {})
+    target = float(commercial.get("target_pct", 40))
+    mode = commercial.get("mode", "margen")
+
+    if mode == "margen":
+        margin_factor = 1 - target / 100.0
+        sale_price = total_cost / (ret_factor * margin_factor)
+    elif mode == "markup":
+        sale_price = total_cost * (1 + target / 100.0) / ret_factor
+    else:
+        raise ValueError(f"Unsupported commercial policy mode: {mode}")
+
+    received = sale_price * ret_factor
+    profit = received - total_cost
+    real_margin = profit / received * 100 if received else 0
+    real_markup = profit / total_cost * 100 if total_cost else 0
+
+    return PriceResult(
+        quantity=quantity,
+        total_cost_unit=total_cost,
+        sale_price_unit=sale_price,
+        received_unit=received,
+        profit_unit=profit,
+        real_margin_pct=real_margin,
+        real_markup_pct=real_markup,
+    )
+
+
+def main(path: str) -> None:
+    config = json.loads(Path(path).read_text(encoding="utf-8"))
+    ranges = config.get("quantity_breaks", [1, 12, 50, 100, 200])
+    results = [calculate_price(config, int(qty)) for qty in ranges]
+
+    print("qty,costo_unitario,precio_unitario,recibido_unitario,ganancia_unitaria,margen_real_pct,markup_real_pct")
+    for r in results:
+        print(
+            f"{r.quantity},"
+            f"{money(r.total_cost_unit)},"
+            f"{money(r.sale_price_unit)},"
+            f"{money(r.received_unit)},"
+            f"{money(r.profit_unit)},"
+            f"{r.real_margin_pct:.2f},"
+            f"{r.real_markup_pct:.2f}"
+        )
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        raise SystemExit("Usage: python scripts/catalog/pricing_model.py <input.json>")
+    main(sys.argv[1])

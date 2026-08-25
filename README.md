@@ -34,6 +34,9 @@ estampados/
 │   └── documentation/
 │       └── migrations-guide.md
 ├── scripts/
+│   ├── catalog/
+│   │   ├── pricing_model.py        # Modelo reproducible basado en cotizador-v2.html
+│   │   └── example_quote_inputs.json
 │   ├── import/
 │   │   ├── _shared.py           # Utilidades: COPY FROM STDIN, trazabilidad, idempotencia
 │   │   ├── import_entidades.py  # Carga de organizaciones y contactos
@@ -48,6 +51,7 @@ estampados/
 │   └── run_db_tests.ps1
 ├── docs/
 │   ├── data_quality_report.md      # Reporte de calidad — corte 2026-08-25
+│   ├── catalogo_propio_mvp.md      # Modelo para convertir costos proveedor en precios propios
 │   ├── pre_pilot_gates.md          # Bloqueos antes de campaña/piloto
 │   └── supabase-staging-setup.md   # Guía de configuración inicial
 ├── .github/
@@ -245,6 +249,20 @@ python scripts/import/import_catalogo.py --file outputs/.../catalogo_promocional
 | `precio_proveedor_snapshot` | 934 |
 | `import_raw_row` | 33,399 |
 | `import_review_item` abiertos | 882 (824 MEDIUM + 58 HIGH) |
+
+---
+
+## Catálogo propio MVP
+
+El catálogo proveedor cargado no es todavía el catálogo vendible. Para transformar costos reales en precios comerciales propios se agregó:
+
+```powershell
+python scripts/catalog/pricing_model.py scripts/catalog/example_quote_inputs.json
+```
+
+El modelo viene de la calculadora local `cotizador-v2.html` y contempla costo proveedor, personalización, empaque, gastos por pedido, desgaste de máquinas, retenciones y margen/markup.
+
+Documento: [`docs/catalogo_propio_mvp.md`](docs/catalogo_propio_mvp.md)
 
 ---
 
