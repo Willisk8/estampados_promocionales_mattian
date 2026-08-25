@@ -4,6 +4,40 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if ($PSVersionTable.PSVersion.Major -ge 7) {
+    $PSNativeCommandUseErrorActionPreference = $true
+}
+
+function Invoke-PsqlChecked {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    & psql @Arguments
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+        throw "psql fallo ($exitCode): $Context"
+    }
+}
+
+function ConvertTo-PsqlLiteral {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Value
+    )
+    return "'" + ($Value -replace "'", "''") + "'"
+}
+
+function ConvertTo-PsqlIncludePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Value
+    )
+    return $Value.Replace("\", "/").Replace("'", "''")
+}
 
 if (-not (Get-Command psql -ErrorAction SilentlyContinue)) {
     throw "psql no esta instalado o no esta en PATH."
@@ -13,7 +47,8 @@ if (-not $DatabaseUrl) {
     throw "DATABASE_URL no esta configurado."
 }
 
-psql $DatabaseUrl -v ON_ERROR_STOP=1 -c @"
+Invoke-PsqlChecked `
+    -Arguments @($DatabaseUrl, "-v", "ON_ERROR_STOP=1", "-c", @"
 CREATE TABLE IF NOT EXISTS schema_migrations (
     filename TEXT PRIMARY KEY,
     applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -30,14 +65,20 @@ DO `$`$ BEGIN
             AS RESTRICTIVE FOR ALL USING (false);
     END IF;
 END `$`$;
-"@
+"@) `
+    -Context "inicializar schema_migrations"
 
 $migrations = Get-ChildItem -LiteralPath $MigrationsDir -Filter "*.sql" |
     Sort-Object Name
 
 foreach ($migration in $migrations) {
     $filename = $migration.Name
-    $alreadyApplied = psql $DatabaseUrl -At -v ON_ERROR_STOP=1 -c "SELECT 1 FROM schema_migrations WHERE filename = '$filename';"
+    $filenameLiteral = ConvertTo-PsqlLiteral $filename
+    $alreadyApplied = & psql $DatabaseUrl -At -v ON_ERROR_STOP=1 -c "SELECT 1 FROM schema_migrations WHERE filename = $filenameLiteral;"
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+        throw "psql fallo ($exitCode): consultar schema_migrations para $filename"
+    }
 
     if ($alreadyApplied -eq "1") {
         Write-Host "Saltando $filename (ya aplicada)."
@@ -45,8 +86,23 @@ foreach ($migration in $migrations) {
     }
 
     Write-Host "Aplicando $filename..."
-    psql $DatabaseUrl -v ON_ERROR_STOP=1 -1 -f $migration.FullName
-    psql $DatabaseUrl -v ON_ERROR_STOP=1 -c "INSERT INTO schema_migrations (filename) VALUES ('$filename');"
+    $migrationPath = ConvertTo-PsqlIncludePath $migration.FullName
+    $scriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("apply_migration_" + [guid]::NewGuid().ToString("N") + ".sql")
+    $script = @"
+\set ON_ERROR_STOP on
+BEGIN;
+\i '$migrationPath'
+INSERT INTO schema_migrations (filename) VALUES ($filenameLiteral);
+COMMIT;
+"@
+    Set-Content -LiteralPath $scriptPath -Value $script -Encoding UTF8
+    try {
+        Invoke-PsqlChecked `
+            -Arguments @($DatabaseUrl, "-v", "ON_ERROR_STOP=1", "-f", $scriptPath) `
+            -Context "aplicar y registrar $filename"
+    } finally {
+        Remove-Item -LiteralPath $scriptPath -Force -ErrorAction SilentlyContinue
+    }
 }
 
 Write-Host "Migraciones pendientes aplicadas correctamente."

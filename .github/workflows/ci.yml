@@ -62,6 +62,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
+      - name: Verify migration runner fails closed
+        shell: pwsh
+        run: ./scripts/test_migration_runner_failure.ps1
+
       - name: Apply migrations
         shell: pwsh
         run: ./scripts/apply_pending_migrations.ps1

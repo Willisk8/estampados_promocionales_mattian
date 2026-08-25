@@ -3,6 +3,24 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if ($PSVersionTable.PSVersion.Major -ge 7) {
+    $PSNativeCommandUseErrorActionPreference = $true
+}
+
+function Invoke-PsqlChecked {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    & psql @Arguments
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+        throw "psql fallo ($exitCode): $Context"
+    }
+}
 
 if (-not (Get-Command psql -ErrorAction SilentlyContinue)) {
     throw "psql no esta instalado o no esta en PATH."
@@ -34,7 +52,9 @@ $tests = Get-ChildItem -LiteralPath "database/tests" -Filter "*.sql" |
 
 foreach ($test in $tests) {
     Write-Host "Ejecutando $($test.Name)..."
-    psql $env:DATABASE_URL -v ON_ERROR_STOP=1 -f $test.FullName
+    Invoke-PsqlChecked `
+        -Arguments @($env:DATABASE_URL, "-v", "ON_ERROR_STOP=1", "-f", $test.FullName) `
+        -Context "ejecutar test $($test.Name)"
 }
 
 Write-Host "Tests de base de datos completados."

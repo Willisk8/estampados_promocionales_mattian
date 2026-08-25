@@ -34,48 +34,10 @@ jobs:
             exit 1
           fi
 
-      - name: Create schema_migrations tracking table
-        run: |
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
-            CREATE TABLE IF NOT EXISTS schema_migrations (
-              filename   TEXT        PRIMARY KEY,
-              applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
-            );
-            ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY;
-            DO \$\$ BEGIN
-              IF NOT EXISTS (
-                SELECT 1 FROM pg_policies
-                WHERE tablename = 'schema_migrations' AND policyname = 'deny_all'
-              ) THEN
-                CREATE POLICY deny_all ON schema_migrations
-                  AS RESTRICTIVE FOR ALL USING (false);
-              END IF;
-            END \$\$;
-          "
-
       - name: Apply pending migrations
-        run: |
-          set -euo pipefail
-          for file in $(ls database/migrations/*.sql | sort); do
-            filename=$(basename "$file")
-            already=$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 \
-              -c "SELECT 1 FROM schema_migrations WHERE filename = '$filename';")
-            if [ "$already" = "1" ]; then
-              echo "Skipping $filename (already applied)"
-            else
-              echo "Applying $filename..."
-              psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -1 -f "$file"
-              psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
-                -c "INSERT INTO schema_migrations (filename) VALUES ('$filename');"
-              echo "Done: $filename"
-            fi
-          done
+        shell: pwsh
+        run: ./scripts/apply_pending_migrations.ps1
 
       - name: Run database tests
-        run: |
-          set -euo pipefail
-          for file in $(ls database/tests/*.sql | sort); do
-            echo "Running test: $(basename $file)..."
-            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
-          done
-          echo "All tests passed."
+        shell: pwsh
+        run: ./scripts/run_db_tests.ps1
