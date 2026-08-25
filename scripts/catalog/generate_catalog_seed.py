@@ -15,7 +15,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from pricing_model import calculate_price, marking_cost_unit, money
+from pricing_model import calculate_price, marking_cost_unit, money, tiered_unit_cost
 
 
 NS = uuid.UUID("7d1f2d5c-6736-4bd8-b582-f055a34d7db1")
@@ -54,7 +54,7 @@ def classify_costs(config: dict[str, Any], reference_qty: int) -> dict[str, floa
 
     for item in config.get("product_costs", []):
         name = str(item.get("name", "")).lower()
-        value = float(item.get("value_unit", 0))
+        value = tiered_unit_cost(item, reference_qty)
         if any(token in name for token in ("proveedor", "material", "insumo", "producto", "camiseta", "mug", "termo")):
             base += value
         elif any(token in name for token in ("mano", "marcacion", "marcación", "personalizacion", "personalización")):
@@ -65,7 +65,11 @@ def classify_costs(config: dict[str, Any], reference_qty: int) -> dict[str, floa
             other += value
 
     personalization += marking_cost_unit(config.get("marking", {}), reference_qty)
-    other += sum(float(c.get("value_total", 0)) for c in config.get("order_costs", [])) / reference_qty
+    other += sum(
+        float(c.get("value_total", 0))
+        for c in config.get("order_costs", [])
+        if c.get("billing") != "separate"
+    ) / reference_qty
     other += sum(
         float(m.get("replacement_value", 0)) / max(float(m.get("estimated_uses", 1)), 1)
         for m in config.get("machines", [])

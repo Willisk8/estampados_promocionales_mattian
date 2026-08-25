@@ -30,6 +30,27 @@ costo_total_unitario =
 + desgaste_maquinas / cantidad
 ```
 
+Cuando el proveedor cambia la forma de compra por volumen, el costo unitario no
+debe ser fijo. Debe resolverse por escala:
+
+```text
+costo_insumo_unitario =
+  valor_unitario_directo
+  o pack_price / pack_qty
+  segun la escala vigente del proveedor para la cantidad cotizada
+```
+
+Para DTF/DTFV se calcula primero el area/largo requerido y luego se compra el
+formato minimo del proveedor que cubra esa necesidad:
+
+```text
+largo_requerido_cm =
+  area_total_cm2 / ancho_rollo_cm * (1 + merma_pct)
+
+costo_transfer_unitario =
+  costo_minimo_formatos_proveedor(largo_requerido_cm_total) / cantidad
+```
+
 Para margen sobre venta:
 
 ```text
@@ -51,20 +72,21 @@ precio_unitario =
 | Insumo principal/proveedor | Material / insumo principal | `costo_producto.costo_base` |
 | Mano de obra | Mano de obra | `costo_producto.costo_personalizacion` |
 | Empaque | Empaque | `costo_producto.costo_empaque` |
-| Flete, transporte, desgaste | Gastos del pedido, maquinas | `costo_producto.otros_costos` o metadata de politica |
+| Flete, transporte, desgaste | Gastos del pedido, maquinas | `costo_producto.otros_costos` o metadata de politica; si `billing=separate`, se cobra aparte y no entra a `precio_producto` |
 | Marcacion | Bordado, DTF, sublimacion, DTF-UV | `costo_personalizacion` + `atributos` de variante |
 | Margen objetivo | Margen sobre venta o markup | metadata/documentacion de precio |
 | Retenciones | ReteICA, ReteFuente, ReteIVA, otra | metadata/documentacion de precio |
-| Desgaste maquinas | Reposicion / usos estimados | Se prorratea por cantidad; para 1 unidad puede omitirse con `machine_wear_policy.skip_for_single_unit` |
+| Escalas proveedor | Unidad, docena, caja, medio metro, metro | `product_costs[].tiers` o `marking.purchase_options`; luego se debe alimentar desde `precio_proveedor_snapshot` |
+| Desgaste maquinas | Reposicion / usos estimados | Se prorratea por cantidad con `machine_wear_policy.min_amortization_qty` para evitar saltos artificiales |
 
 ## Tecnicas soportadas por la calculadora
 
 | Tecnica | Formula simplificada |
 |---|---|
 | Bordado | `costo_fijo_programa / cantidad + extra_unitario` |
-| DTF camiseta | `area_cm2 / ancho_rollo / 100 * (1 + merma) * precio_metro` |
+| DTF camiseta | `area_total / ancho_rollo * (1 + merma)` y compra optima entre formatos de proveedor: 30cm, 50cm, 100cm, etc. |
 | Sublimacion mug | `papel + tinta + electricidad_plancha` |
-| DTF-UV rigido | `area_cm2 / ancho_rollo / 100 * (1 + merma) * precio_metro + transporte / cantidad` |
+| DTF-UV rigido | igual que DTF, pero con lista propia de formatos/precios DTFV/UV |
 
 ## Script reproducible
 
@@ -90,7 +112,14 @@ El SQL deja `producto` y `variante_producto` en `DRAFT`. Esto es intencional: `r
 
 Limitacion actual: `costo_producto` no tiene rango por cantidad. Por eso el generador guarda un costo de referencia (`cost_reference_quantity`) y los precios comerciales por escala quedan en `precio_producto.quantity_range`.
 
-Regla comercial actual: para pedidos de 1 unidad no se carga desgaste de maquinas. Por eso las escalas MVP separan `[1,2)` de `[2,12)`.
+Regla comercial actual: los precios de proveedor pueden cambiar mensual, diario o por negociacion. En STAGING/produccion se deben guardar como snapshots append-only en `precio_proveedor_snapshot` y luego regenerar costos/precios propios con nueva `vigencia`. No se debe actualizar historico en sitio.
+
+Ejemplos actuales de insumo usados por el MVP:
+
+- Mug 11 oz: costo unitario para compra suelta; desde 12/36 unidades se usa caja x36 (`pack_price / 36`).
+- Camiseta Etanol: costo por escala proveedor (`tiers`) pendiente de validar contra lista oficial/foto/PDF.
+- DTF textil Surtimundo/Surtivinilos: formatos 58x30, 58x50 y 58x100 cm.
+- DTFV/DTF UV Surtimundo/Surtivinilos: formatos 58x15, 58x50 y 58x100 cm.
 
 ## Proximo paso operativo
 

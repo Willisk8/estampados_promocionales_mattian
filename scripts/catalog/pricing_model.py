@@ -32,8 +32,71 @@ class PriceResult:
     real_markup_pct: float
 
 
+def tiered_unit_cost(item: dict[str, Any], quantity: int) -> float:
+    """Devuelve costo unitario de un insumo según escala/proveedor.
+
+    Formatos soportados:
+    - {"value_unit": 15000}
+    - {"tiers": [{"from_qty": 1, "value_unit": 13000}, ...]}
+    - {"tiers": [{"from_qty": 12, "pack_qty": 36, "pack_price": 129000}, ...]}
+    """
+    tiers = item.get("tiers")
+    if not tiers:
+        return float(item.get("value_unit", 0))
+
+    valid_tiers = [
+        t for t in tiers
+        if int(t.get("from_qty", 1)) <= quantity
+    ]
+    if not valid_tiers:
+        valid_tiers = [min(tiers, key=lambda t: int(t.get("from_qty", 1)))]
+
+    tier = max(valid_tiers, key=lambda t: int(t.get("from_qty", 1)))
+    if "value_unit" in tier:
+        return float(tier["value_unit"])
+    if "pack_price" in tier and "pack_qty" in tier:
+        return float(tier["pack_price"]) / max(float(tier["pack_qty"]), 1)
+    raise ValueError(f"Invalid cost tier for {item.get('name', 'unnamed item')}: {tier}")
+
+
 def electricity_cost_unit(watts: float, seconds: float, passes: int, kwh_price: float) -> float:
     return (watts / 1000.0) * ((seconds * passes) / 3600.0) * kwh_price
+
+
+def least_cost_sheet_purchase(required_height_cm: float, options: list[dict[str, Any]]) -> float:
+    """Costo mínimo para cubrir un largo requerido con formatos de proveedor.
+
+    Se asume que todas las opciones comparten el mismo ancho útil de impresión.
+    El cálculo permite combinar formatos: por ejemplo 8 metros + 30 cm.
+    """
+    if required_height_cm <= 0:
+        return 0.0
+    if not options:
+        return 0.0
+
+    normalized = [
+        (int(round(float(o["height_cm"]))), float(o["price"]))
+        for o in options
+        if float(o.get("height_cm", 0)) > 0
+    ]
+    if not normalized:
+        return 0.0
+
+    target = int(round(required_height_cm + 0.499999))
+    max_height = max(height for height, _ in normalized)
+    limit = target + max_height
+    inf = float("inf")
+    dp = [inf] * (limit + 1)
+    dp[0] = 0.0
+
+    for current in range(limit + 1):
+        if dp[current] == inf:
+            continue
+        for height, price in normalized:
+            nxt = min(limit, current + height)
+            dp[nxt] = min(dp[nxt], dp[current] + price)
+
+    return min(dp[target:])
 
 
 def marking_cost_unit(config: dict[str, Any], quantity: int) -> float:
@@ -48,7 +111,6 @@ def marking_cost_unit(config: dict[str, Any], quantity: int) -> float:
         return fixed / quantity + extra
 
     if mode == "dtf":
-        price_per_meter = float(config.get("price_per_meter", 0))
         roll_width_cm = float(config.get("roll_width_cm", 58))
         waste_pct = float(config.get("waste_pct", 0))
         designs = config.get("designs", [])
@@ -59,8 +121,13 @@ def marking_cost_unit(config: dict[str, Any], quantity: int) -> float:
             * float(d.get("units_per_product", 1))
             for d in designs
         )
-        meters_unit = (total_area_cm2 / roll_width_cm / 100.0) * (1 + waste_pct / 100.0)
-        cost = meters_unit * price_per_meter
+        total_height_cm = (total_area_cm2 * quantity / roll_width_cm) * (1 + waste_pct / 100.0)
+        if config.get("purchase_options"):
+            cost = least_cost_sheet_purchase(total_height_cm, config["purchase_options"]) / quantity
+        else:
+            price_per_meter = float(config.get("price_per_meter", 0))
+            meters_unit = (total_area_cm2 / roll_width_cm / 100.0) * (1 + waste_pct / 100.0)
+            cost = meters_unit * price_per_meter
 
         iron = config.get("iron")
         if iron and iron.get("include", False):
@@ -89,11 +156,14 @@ def marking_cost_unit(config: dict[str, Any], quantity: int) -> float:
 
     if mode == "dtf_uv":
         price_per_meter = float(config.get("price_per_meter", 0))
-        roll_width_cm = float(config.get("roll_width_cm", 57))
+        roll_width_cm = float(config.get("roll_width_cm", 58))
         width_cm = float(config.get("width_cm", 0))
         height_cm = float(config.get("height_cm", 0))
         waste_pct = float(config.get("waste_pct", 0))
         transport_total = float(config.get("transport_total", 0))
+        total_height_cm = (width_cm * height_cm * quantity / roll_width_cm) * (1 + waste_pct / 100.0)
+        if config.get("purchase_options"):
+            return least_cost_sheet_purchase(total_height_cm, config["purchase_options"]) / quantity + transport_total / quantity
         meters_unit = (width_cm * height_cm / roll_width_cm / 100.0) * (1 + waste_pct / 100.0)
         return meters_unit * price_per_meter + transport_total / quantity
 
@@ -110,7 +180,7 @@ def shipping_cost_unit(config: dict[str, Any], quantity: int) -> float:
 
 
 def calculate_price(config: dict[str, Any], quantity: int) -> PriceResult:
-    product_costs = sum(float(c.get("value_unit", 0)) for c in config.get("product_costs", []))
+    product_costs = sum(tiered_unit_cost(c, quantity) for c in config.get("product_costs", []))
     # Solo incluir order_costs sin billing=separate en el precio unitario
     order_costs_unit = sum(
         float(c.get("value_total", 0))

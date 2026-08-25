@@ -18,13 +18,21 @@
         }
       },
       "supplier_product_ids": [],
-      "quantity_breaks": [1, 2, 12, 50, 100, 200],
+      "quantity_breaks": [1, 2, 12, 36, 50, 100, 200],
       "cost_reference_quantity": 100,
       "machine_wear_policy": {
         "min_amortization_qty": 12
       },
       "product_costs": [
-        {"name": "Costo proveedor mug", "value_unit": 6200},
+        {
+          "name": "Costo proveedor mug blanco 11 oz",
+          "supplier": "Proveedor por confirmar",
+          "tiers": [
+            {"from_qty": 1, "value_unit": 6200, "source_note": "compra unitaria"},
+            {"from_qty": 12, "pack_qty": 36, "pack_price": 129000, "source_note": "caja x36 referencia Sublifly"},
+            {"from_qty": 36, "pack_qty": 36, "pack_price": 120000, "source_note": "caja x36 referencia MundoClic"}
+          ]
+        },
         {"name": "Mano de obra", "value_unit": 800},
         {"name": "Empaque", "value_unit": 500}
       ],
@@ -72,13 +80,21 @@
         }
       },
       "supplier_product_ids": [],
-      "quantity_breaks": [1, 2, 12, 50, 100, 200],
+      "quantity_breaks": [1, 2, 12, 36, 50, 100, 200],
       "cost_reference_quantity": 100,
       "machine_wear_policy": {
         "min_amortization_qty": 12
       },
       "product_costs": [
-        {"name": "Costo proveedor camiseta", "value_unit": 15000},
+        {
+          "name": "Camiseta Etanol",
+          "supplier": "Etanol",
+          "tiers": [
+            {"from_qty": 1, "value_unit": 13000, "source_note": "referencia proveedor por validar"},
+            {"from_qty": 12, "value_unit": 12000, "source_note": "referencia proveedor por validar"},
+            {"from_qty": 50, "value_unit": 11000, "source_note": "referencia proveedor por validar"}
+          ]
+        },
         {"name": "Mano de obra", "value_unit": 1200},
         {"name": "Empaque", "value_unit": 700}
       ],
@@ -91,9 +107,14 @@
       ],
       "marking": {
         "mode": "dtf",
-        "price_per_meter": 12000,
         "roll_width_cm": 58,
         "waste_pct": 10,
+        "supplier": "Surtimundo/Surtivinilos",
+        "purchase_options": [
+          {"width_cm": 58, "height_cm": 30, "price": 8000, "source_note": "DTF textil minimo 58x30"},
+          {"width_cm": 58, "height_cm": 50, "price": 13000, "source_note": "DTF textil 58x50"},
+          {"width_cm": 58, "height_cm": 100, "price": 26000, "source_note": "DTF textil 58x100"}
+        ],
         "designs": [
           {"name": "Pecho", "width_cm": 10, "height_cm": 12, "units_per_product": 1},
           {"name": "Espalda", "width_cm": 25, "height_cm": 30, "units_per_product": 1}
@@ -132,7 +153,7 @@
         }
       },
       "supplier_product_ids": [],
-      "quantity_breaks": [1, 2, 12, 50, 100, 200],
+      "quantity_breaks": [1, 2, 12, 36, 50, 100, 200],
       "cost_reference_quantity": 100,
       "machine_wear_policy": {
         "min_amortization_qty": 12
@@ -150,11 +171,16 @@
       ],
       "marking": {
         "mode": "dtf_uv",
-        "price_per_meter": 30000,
-        "roll_width_cm": 57,
+        "roll_width_cm": 58,
         "width_cm": 8,
         "height_cm": 10,
         "waste_pct": 10,
+        "supplier": "Surtimundo/Surtivinilos",
+        "purchase_options": [
+          {"width_cm": 58, "height_cm": 15, "price": 15000, "source_note": "DTFV minimo 58x15"},
+          {"width_cm": 58, "height_cm": 50, "price": 32500, "source_note": "DTFV 58x50"},
+          {"width_cm": 58, "height_cm": 100, "price": 65000, "source_note": "DTFV 58x100"}
+        ],
         "transport_total": 0
       },
       "withholdings": {
