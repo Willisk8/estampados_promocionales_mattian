@@ -27,6 +27,22 @@ Dos técnicas (`acabado_agenda_multitecnica` y `vinilo_alta_densidad`) fueron
 derivadas desde observaciones de precio porque no venían en el catálogo curado.
 Quedan en `PENDING_REVIEW` hasta que se confirme su semántica comercial.
 
+La migración `036_curate_marking_technique_prices.sql` agrega la curación
+operativa sin modificar los snapshots append-only:
+
+- `AUTOMATIC_PRICING`: puede alimentar calculadora interna.
+- `REFERENCE_ONLY`: benchmark o referencia parcial.
+- `NEEDS_REVIEW`: requiere validación de unidad, setup, mínimo o alcance.
+- `DO_NOT_USE`: reservado para observaciones descartadas.
+
+Vista de consumo:
+
+```sql
+SELECT *
+FROM vw_precio_tecnica_marcacion_curado
+WHERE usage_status = 'AUTOMATIC_PRICING';
+```
+
 ## Calidad de datos de la investigación
 
 | Técnica | Uso recomendado hoy | Motivo |
@@ -88,3 +104,14 @@ python scripts/import/import_tecnicas_marcacion.py `
 ```
 
 El importador registra trazabilidad en `import_batch` e `import_raw_row`.
+
+## Export para calculadora
+
+```powershell
+python scripts/catalog/export_marking_cost_inputs.py > outputs/marking_cost_inputs.json
+```
+
+Este export lee solamente snapshots curados como `AUTOMATIC_PRICING`. La
+calculadora sigue pudiendo usar `mvp_catalog_inputs.json`, pero este archivo ya
+permite auditar o reemplazar manualmente los costos de DTF, DTF UV y
+sublimación con datos versionados de STAGING.
