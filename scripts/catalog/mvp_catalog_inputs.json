@@ -1,5 +1,5 @@
 {
-  "valid_from": "2026-09-01T00:00:00+00:00",
+  "valid_from": "2026-08-01T00:00:00+00:00",
   "valid_to": "2026-12-31T23:59:59+00:00",
   "products": [
     {
@@ -182,6 +182,132 @@
           {"width_cm": 58, "height_cm": 100, "price": 65000, "source_note": "DTFV 58x100"}
         ],
         "transport_total": 0
+      },
+      "withholdings": {
+        "reteica_pct": 1.104,
+        "retefuente_pct": 2.5,
+        "reteiva_pct": 0,
+        "other_pct": 0
+      },
+      "commercial_policy": {
+        "mode": "margen",
+        "target_pct": 40
+      }
+    },
+    {
+      "product": {
+        "sku": "PRD-TULA-ECO",
+        "name": "Tula ecológica personalizada",
+        "category": "Bolsas",
+        "description": "Producto MVP con costo proveedor y marcación DTF textil 15x20 cm. Valores placeholder documentados por confirmar.",
+        "variant_sku": "PRD-TULA-ECO-DTF",
+        "variant_name": "Tula ecológica estampado DTF 15x20 cm",
+        "attributes": {
+          "material": "lona_algodon_por_confirmar",
+          "color": "natural_por_confirmar",
+          "tecnica_personalizacion": "dtf",
+          "area_marcacion_cm": "15x20",
+          "estado_costos": "placeholder_por_confirmar"
+        }
+      },
+      "supplier_product_ids": [],
+      "quantity_breaks": [1, 2, 12, 36, 50, 100, 200],
+      "cost_reference_quantity": 100,
+      "machine_wear_policy": {
+        "min_amortization_qty": 12
+      },
+      "product_costs": [
+        {
+          "name": "Costo proveedor tula lona 35x40",
+          "supplier": "Proveedor por confirmar",
+          "tiers": [
+            {"from_qty": 1, "value_unit": 8500, "source_note": "placeholder referencia mercado por confirmar"},
+            {"from_qty": 12, "value_unit": 7800, "source_note": "placeholder docena por confirmar"},
+            {"from_qty": 50, "value_unit": 7200, "source_note": "placeholder mayorista por confirmar"}
+          ]
+        },
+        {"name": "Mano de obra", "value_unit": 800},
+        {"name": "Empaque", "value_unit": 600}
+      ],
+      "order_costs": [
+        {"name": "Transporte proveedor", "value_total": 15000, "billing": "separate"}
+      ],
+      "machines": [
+        {"name": "Plancha calor DTF", "replacement_value": 800000, "estimated_uses": 1500}
+      ],
+      "marking": {
+        "mode": "dtf",
+        "roll_width_cm": 58,
+        "waste_pct": 10,
+        "supplier": "Surtimundo/Surtivinilos",
+        "purchase_options": [
+          {"width_cm": 58, "height_cm": 30, "price": 8000, "source_note": "DTF textil minimo 58x30"},
+          {"width_cm": 58, "height_cm": 50, "price": 13000, "source_note": "DTF textil 58x50"},
+          {"width_cm": 58, "height_cm": 100, "price": 26000, "source_note": "DTF textil 58x100"}
+        ],
+        "designs": [
+          {"name": "Frente", "width_cm": 15, "height_cm": 20, "units_per_product": 1}
+        ],
+        "iron": {
+          "include": true,
+          "watts": 2000,
+          "seconds": 160,
+          "passes": 1,
+          "kwh_price": 900
+        }
+      },
+      "withholdings": {
+        "reteica_pct": 1.104,
+        "retefuente_pct": 2.5,
+        "reteiva_pct": 0,
+        "other_pct": 0
+      },
+      "commercial_policy": {
+        "mode": "margen",
+        "target_pct": 40
+      }
+    },
+    {
+      "product": {
+        "sku": "PRD-ESFERO-ECO",
+        "name": "Esfero ecológico personalizado",
+        "category": "Esferos",
+        "description": "Producto MVP con costo proveedor y marcación fija provisional. Tampografía/UV pendiente de validar unidad, setup y mínimos.",
+        "variant_sku": "PRD-ESFERO-ECO-1TINTA",
+        "variant_name": "Esfero ecológico marcación 1 tinta",
+        "attributes": {
+          "material": "ecologico_por_confirmar",
+          "color": "por_definir",
+          "tecnica_personalizacion": "tampografia_o_uv_por_confirmar",
+          "estado_costos": "placeholder_por_confirmar"
+        }
+      },
+      "supplier_product_ids": [],
+      "quantity_breaks": [1, 12, 50, 100, 200, 500, 1000],
+      "cost_reference_quantity": 500,
+      "machine_wear_policy": {
+        "min_amortization_qty": 100
+      },
+      "product_costs": [
+        {
+          "name": "Costo proveedor esfero ecologico",
+          "supplier": "Proveedor por confirmar",
+          "tiers": [
+            {"from_qty": 1, "value_unit": 1800, "source_note": "placeholder referencia mercado por confirmar"},
+            {"from_qty": 100, "value_unit": 1450, "source_note": "placeholder volumen por confirmar"},
+            {"from_qty": 500, "value_unit": 1250, "source_note": "placeholder mayorista por confirmar"}
+          ]
+        },
+        {"name": "Marcacion tampografia 1 tinta provisional", "value_unit": 1000},
+        {"name": "Mano de obra", "value_unit": 200},
+        {"name": "Empaque", "value_unit": 150}
+      ],
+      "order_costs": [
+        {"name": "Transporte proveedor", "value_total": 15000, "billing": "separate"}
+      ],
+      "machines": [],
+      "marking": {
+        "mode": "none"
       },
       "withholdings": {
         "reteica_pct": 1.104,
