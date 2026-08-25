@@ -62,6 +62,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
+      # El contenedor postgres no trae los roles anon/authenticated/service_role
+      # ni el esquema auth. Las migraciones 011, 018, 019 y 020 los revocan sin
+      # guarda, y la migracion de acceso a la consola usa auth.uid().
+      - name: Bootstrap Supabase roles and auth schema
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/ci/bootstrap_supabase_roles.sql
+
       - name: Verify migration runner fails closed
         shell: pwsh
         run: ./scripts/test_migration_runner_failure.ps1
