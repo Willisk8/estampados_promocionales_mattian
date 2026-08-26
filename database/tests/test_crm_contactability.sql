@@ -392,18 +392,61 @@ INSERT INTO import_raw_row (
     now() - interval '120 days'
 );
 
+-- fn_anonymize_import_raw_rows exige rol ADMIN desde 051 (antes no
+-- verificaba ningun rol: era el hallazgo critico de willi-eb).
+INSERT INTO auth.users (id, email) VALUES
+    ('00000000-0000-4000-b000-000000000090', 'lectura-anonimizar@prueba.local'),
+    ('00000000-0000-4000-b000-000000000091', 'admin-anonimizar@prueba.local');
+
+INSERT INTO perfil_usuario (user_id, email, rol, activo) VALUES
+    ('00000000-0000-4000-b000-000000000090', 'lectura-anonimizar@prueba.local', 'LECTURA', true),
+    ('00000000-0000-4000-b000-000000000091', 'admin-anonimizar@prueba.local', 'ADMIN', true);
+
+SELECT set_config('request.jwt.claims',
+                  '{"sub":"00000000-0000-4000-b000-000000000090"}', true);
+SET LOCAL ROLE authenticated;
+
+DO $$
+DECLARE v_bloqueada BOOLEAN := false;
+BEGIN
+    BEGIN
+        PERFORM fn_anonymize_import_raw_rows(90, true);
+    EXCEPTION WHEN OTHERS THEN
+        v_bloqueada := true;
+    END;
+    ASSERT v_bloqueada, 'LECTURA no debe poder ejecutar la anonimizacion de PII';
+    RAISE NOTICE 'PASSED - LECTURA bloqueada en fn_anonymize_import_raw_rows';
+END;
+$$;
+
+RESET ROLE;
+
+SELECT set_config('request.jwt.claims',
+                  '{"sub":"00000000-0000-4000-b000-000000000091"}', true);
+SET LOCAL ROLE authenticated;
+
 DO $$
 DECLARE
     v_count INTEGER;
-    v_raw JSONB;
-    v_target UUID;
 BEGIN
     SELECT fn_anonymize_import_raw_rows(90, true) INTO v_count;
     ASSERT v_count >= 1, 'dry-run should count at least one old raw row';
 
     SELECT fn_anonymize_import_raw_rows(90, false) INTO v_count;
     ASSERT v_count >= 1, 'apply should anonymize at least one old raw row';
+END;
+$$;
 
+-- import_raw_row es PII con deny_all: ni siquiera ADMIN-como-authenticated
+-- puede leerla directo. La verificacion corre como owner, despues de
+-- soltar el rol de la prueba anterior.
+RESET ROLE;
+
+DO $$
+DECLARE
+    v_raw JSONB;
+    v_target UUID;
+BEGIN
     SELECT raw_payload, target_id
       INTO v_raw, v_target
       FROM import_raw_row
