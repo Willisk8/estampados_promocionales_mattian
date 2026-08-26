@@ -45,12 +45,14 @@ jobs:
           cache-dependency-path: |
             scripts/import/requirements.txt
             scraping/requirements.txt
+            scripts/evals/requirements.txt
 
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r scripts/import/requirements.txt
           python -m pip install -r scraping/requirements.txt
+          python -m pip install -r scripts/evals/requirements.txt
 
       - name: Run Python unit tests
         run: |
@@ -79,3 +81,9 @@ jobs:
       - name: Run database tests
         shell: pwsh
         run: ./scripts/run_db_tests.ps1
+
+      # Necesita las migraciones ya aplicadas (fn_ai_*, 045), por eso corre
+      # aqui y no en el paso "Run Python unit tests" de mas arriba, que se
+      # ejecuta antes de que exista ninguna migracion en la base.
+      - name: Run AI evals (Cliente 360)
+        run: python -m unittest scripts.evals.run_evals -v

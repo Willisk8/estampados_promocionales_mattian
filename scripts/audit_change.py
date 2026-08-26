@@ -37,6 +37,10 @@ TABLAS_PII = (
     "persona_organizacion",
     "contactabilidad",
     "supresion",
+    # Etapa C, Fase 1 (docs/plan_ia.md): guardan id_persona y resumenes de
+    # conversaciones. Se leen solo por fn_consola_timeline_cliente.
+    "interaccion_cliente",
+    "cliente_evento",
 )
 
 # Vistas que exponen correos en crudo y nunca se otorgan a authenticated.
@@ -117,6 +121,43 @@ def remediada_en_otra_migracion(funcion: str) -> bool:
         if patron.search(sin_comentarios(otra.read_text(encoding="utf-8", errors="replace"))):
             return True
     return False
+
+
+def guardia_rol_null_corregida(funcion: str) -> bool:
+    """¿La definicion VIGENTE (la de mayor numero de migracion) de esta
+    funcion ya trae la guardia NULL-segura?
+
+    046_close_anon_execute_and_null_role_bypass.sql reescribio 14 funciones
+    con CREATE OR REPLACE FUNCTION para que "v_rol NULL" ya no atraviese el
+    chequeo de rol. El archivo que las creo originalmente es inmutable (no
+    se edita, ver migracion-inmutable arriba) y conserva el patron viejo en
+    su texto para siempre. Sin esta comprobacion, --all quedaria en rojo de
+    forma permanente por 14 hallazgos ya resueltos hacia adelante -exactamente
+    el mismo caso que remediada_en_otra_migracion ya resuelve para
+    search-path-fijo, aplicado aqui a una guardia distinta.
+
+    Importante: se compara contra la ULTIMA definicion (por numero de
+    archivo), no contra "existe en algun punto del historial". Una
+    migracion futura podria volver a tocar una de estas 14 funciones y
+    reintroducir el patron vulnerable por accidente -ya paso varias veces
+    en este repo, p.ej. fn_consola_actualizar_estado_comercial redefinida
+    en 029, 031 y 032-; una version vieja y ya superada no debe poder
+    enmascarar esa regresion. Hallado por auditoria externa (sesion
+    willi-eb) con una prueba reproducible antes de aplicar este ajuste.
+    """
+    patron_funcion = re.compile(
+        r"CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?" + re.escape(funcion) + r"\s*\(",
+        re.I,
+    )
+    ultima_es_segura = False
+    for otra in sorted((ROOT / "database" / "migrations").glob("*.sql"), key=lambda p: p.name):
+        texto = sin_comentarios(otra.read_text(encoding="utf-8", errors="replace"))
+        m = patron_funcion.search(texto)
+        if not m:
+            continue
+        ventana = texto[m.end(): m.end() + 6000]
+        ultima_es_segura = bool(re.search(r"v_rol\s+IS\s+NULL\s+OR\s+v_rol\s+NOT\s+IN", ventana, re.I))
+    return ultima_es_segura
 
 
 def auditar_migracion(path: Path, rep: Reporte) -> None:
@@ -217,6 +258,29 @@ def auditar_migracion(path: Path, rep: Reporte) -> None:
                     "Debe quedar solo para service_role/psql.",
                     rel,
                 )
+
+    # NULL NOT IN (...) es NULL, y PL/pgSQL trata un IF con condicion NULL
+    # como falso: la guardia "IF v_rol NOT IN (...) THEN RAISE EXCEPTION"
+    # no dispara para un usuario sin perfil activo (v_rol NULL), dejandolo
+    # pasar. Se descubrio en 14 funciones vivas al construir los evals de
+    # la Fase 6 (046_close_anon_execute_and_null_role_bypass.sql). La forma
+    # segura es "IF v_rol IS NULL OR v_rol NOT IN (...)".
+    for m in re.finditer(r"IF\s+v_rol\s+NOT\s+IN", sql, re.I):
+        contexto_previo = sql[max(0, m.start() - 40):m.start()]
+        if re.search(r"v_rol\s+IS\s+NULL\s+OR\s*$", contexto_previo, re.I):
+            continue
+        anterior = sql[: m.start()]
+        creadas = re.findall(r"CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(\w+)", anterior, re.I)
+        funcion = creadas[-1] if creadas else None
+        if funcion and guardia_rol_null_corregida(funcion):
+            continue
+        rep.error(
+            "guardia-rol-null",
+            "'IF v_rol NOT IN (...)' no bloquea v_rol NULL (sin perfil activo): "
+            "NULL NOT IN (...) es NULL, y PL/pgSQL trata un IF nulo como falso. "
+            "Usa 'IF v_rol IS NULL OR v_rol NOT IN (...)'.",
+            rel,
+        )
 
     # Los snapshots son append-only.
     for tabla in TABLAS_APPEND_ONLY:

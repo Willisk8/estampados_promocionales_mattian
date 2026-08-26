@@ -1,9 +1,20 @@
 -- ============================================================
 -- test_quote_engine_components.sql
 -- Pruebas del motor aditivo de cotizacion por componentes.
+--
+-- Desde 049, fn_calculate_quote_components exige rol ADMIN: las llamadas
+-- de este archivo corren con un perfil ADMIN activo, no como owner sin rol.
 -- ============================================================
 
 BEGIN;
+
+INSERT INTO auth.users (id, email) VALUES
+    ('00000000-0000-4000-f200-000000000001', 'admin-quote-engine@prueba.local'),
+    ('00000000-0000-4000-f200-000000000002', 'comercial-quote-engine@prueba.local');
+
+INSERT INTO perfil_usuario (user_id, email, rol, activo) VALUES
+    ('00000000-0000-4000-f200-000000000001', 'admin-quote-engine@prueba.local', 'ADMIN', true),
+    ('00000000-0000-4000-f200-000000000002', 'comercial-quote-engine@prueba.local', 'COMERCIAL', true);
 
 DO $$
 BEGIN
@@ -66,6 +77,39 @@ INSERT INTO producto_tecnica (
     '{"tecnica":"sublimacion","caras":1,"disenos":1,"transporte":false}'::JSONB,
     3
 );
+
+-- ----------------------------------------------------------
+-- COMERCIAL no puede consultar costos/margenes (049): FORBIDDEN, no un
+-- resultado con cifras.
+-- ----------------------------------------------------------
+SELECT set_config('request.jwt.claims',
+                  '{"sub":"00000000-0000-4000-f200-000000000002"}', true);
+SET LOCAL ROLE authenticated;
+
+DO $$
+DECLARE v_status TEXT;
+BEGIN
+    SELECT status INTO v_status
+      FROM fn_calculate_quote_components(
+          '00000000-0000-4000-f100-000000000001', NULL, 100,
+          '00000000-0000-4000-f100-000000000002', 1, 25000, 'MVP_DEFAULT',
+          '2026-08-15 00:00:00+00'::TIMESTAMPTZ, 'COP'
+      )
+      LIMIT 1;
+    ASSERT v_status = 'FORBIDDEN', format('COMERCIAL no debe ver costos, esperaba FORBIDDEN, obtuve %s', v_status);
+    RAISE NOTICE 'PASSED - COMERCIAL bloqueado de costos y margenes';
+END;
+$$;
+
+RESET ROLE;
+
+-- ----------------------------------------------------------
+-- ADMIN si puede: el resto de las aserciones originales corren con perfil
+-- ADMIN activo.
+-- ----------------------------------------------------------
+SELECT set_config('request.jwt.claims',
+                  '{"sub":"00000000-0000-4000-f200-000000000001"}', true);
+SET LOCAL ROLE authenticated;
 
 DO $$
 DECLARE
@@ -161,6 +205,10 @@ BEGIN
 END;
 $$;
 
+RESET ROLE;
+
+-- vw_published_price_health se revoca de anon/authenticated desde 038:
+-- solo el owner la lee, por eso el resto de este archivo corre sin rol.
 INSERT INTO precio_producto (
     id_precio, id_producto, id_variante, quantity_range, validity,
     precio_unitario, moneda
