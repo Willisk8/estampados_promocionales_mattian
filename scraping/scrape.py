@@ -90,7 +90,7 @@ def ensure_dirs() -> None:
 def clean_text(value: object) -> str:
     if value is None or pd.isna(value):
         return ""
-    return re.sub(r"\s+", " ", str(value)).strip()
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFC", str(value))).strip()
 
 
 def ascii_key(value: object) -> str:

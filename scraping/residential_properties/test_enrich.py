@@ -1,6 +1,6 @@
 import unittest
 
-from enrich import email_domain, property_match, whatsapp_number
+from enrich import canonical_phone, email_domain, property_match, whatsapp_number
 
 
 class EnrichmentTests(unittest.TestCase):
@@ -22,6 +22,11 @@ class EnrichmentTests(unittest.TestCase):
 
     def test_whatsapp_link(self):
         self.assertEqual(whatsapp_number("https://wa.me/573001234567"), "+573001234567")
+
+    def test_phone_prefixes_follow_crc_attribution(self):
+        self.assertEqual(canonical_phone("601 234 5678"), "+576012345678")
+        self.assertEqual(canonical_phone("603 234 5678"), "6032345678")
+        self.assertEqual(canonical_phone("340 234 5678"), "3402345678")
 
 
 if __name__ == "__main__":

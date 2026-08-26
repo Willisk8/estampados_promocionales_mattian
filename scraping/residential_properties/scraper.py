@@ -90,7 +90,7 @@ def now_iso() -> str:
 def clean(value: Any) -> str:
     if value is None:
         return ""
-    text = re.sub(r"\s+", " ", str(value)).strip()
+    text = re.sub(r"\s+", " ", unicodedata.normalize("NFC", str(value))).strip()
     return "" if text.casefold() in MISSING_VALUES else text
 
 
@@ -113,7 +113,7 @@ def normalize_phone(value: Any) -> str:
     raw = clean(value)
     if not raw:
         return ""
-    candidates = re.findall(r"(?:\+?57\s*)?(?:\(?60[1-8]\)?\s*)?(?:3\d{9}|\d{7})(?:\s*(?:ext\.?|x)\s*\d+)?", raw, re.I)
+    candidates = re.findall(r"(?:\+?57\s*)?(?:\(?60[1245678]\)?\s*)?(?:3\d{9}|\d{7})(?:\s*(?:ext\.?|x)\s*\d+)?", raw, re.I)
     return "; ".join(dict.fromkeys(re.sub(r"\s+", " ", item).strip() for item in candidates))
 
 

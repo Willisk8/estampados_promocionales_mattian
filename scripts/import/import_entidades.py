@@ -25,6 +25,7 @@ from pathlib import Path
 import openpyxl
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from _shared import (
     clean_value,
     copy_into,
@@ -36,6 +37,11 @@ from _shared import (
     source_run_name,
     stable_uuid,
     complete_batch,
+)
+from scripts.data_quality.normalization import (
+    normalize_colombian_phone as normalize_colombian_phone_result,
+    normalize_email as normalize_email_standard,
+    normalize_text,
 )
 
 
@@ -91,12 +97,32 @@ def is_malformed_email_domain(value: str | None) -> bool:
     return email_domain(value) in MALFORMED_EMAIL_DOMAINS
 
 
+def sanitize_visible_text(value: object | None) -> str | None:
+    """Unicode NFC y espacios seguros; conserva tildes y puntuacion interna."""
+    text = normalize_text(value)
+    return text or None
+
+
+def normalize_colombian_phone(value: object | None) -> str:
+    """Compatibilidad del importador: devuelve el numero nacional normalizado."""
+    return normalize_colombian_phone_result(value).national_number
+
+
+def classify_colombian_phone(value: object | None) -> str:
+    return normalize_colombian_phone_result(value).classification
+
+
 def normalize_contact_record(record: dict) -> dict:
     normalized = dict(record)
     tipo = str(normalized.get("tipo") or "").upper()
     value = clean_value(normalized.get("valor_normalizado") or normalized.get("valor_original"))
-    if tipo == "EMAIL" and value:
-        value = str(value).lower()
+    if tipo in {"TELEFONO", "WHATSAPP"}:
+        value = normalize_colombian_phone(value)
+        normalized["telefono_clasificacion"] = classify_colombian_phone(value)
+    elif tipo == "EMAIL" and value:
+        value, _ = normalize_email_standard(value)
+    else:
+        value = sanitize_visible_text(value)
     normalized["tipo"] = tipo
     normalized["valor_normalizado"] = value
     return normalized
@@ -120,6 +146,18 @@ def prepare_contact_records(records: list[dict]) -> list[dict]:
             record["__review_severity"] = "HIGH"
             record["__review_reason"] = (
                 "email dominio malformado por posible concatenacion: " + domain
+            )
+        elif (
+            record["tipo"] in {"TELEFONO", "WHATSAPP"}
+            and normalized.get("telefono_clasificacion") in {
+                "INVALIDO", "RANGO_NO_ATRIBUIDO", "FIJO_LOCAL_SIN_INDICATIVO"
+            }
+        ):
+            classification = normalized.get("telefono_clasificacion")
+            record["estado"] = "INVALID" if classification == "INVALIDO" else "REVIEW_REQUIRED"
+            record["__review_reason"] = (
+                "Telefono colombiano requiere revision: fijo 601, 602 o 604-608; "
+                "celular terrestre 300-305, 310-324 o 333"
             )
         prepared.append(record)
     return prepared

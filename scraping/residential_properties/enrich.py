@@ -73,7 +73,7 @@ def now_iso() -> str:
 
 
 def clean(value: Any) -> str:
-    return re.sub(r"\s+", " ", str(value or "")).strip()
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFC", str(value or ""))).strip()
 
 
 def folded(value: Any) -> str:
@@ -93,7 +93,13 @@ def canonical_phone(value: str) -> str:
         return ""
     if digits.startswith("57") and len(digits) in {12, 13}:
         return "+" + digits
-    if len(digits) == 10 and (digits.startswith("3") or digits.startswith("60")):
+    prefix = digits[:3]
+    valid_mobile = (
+        300 <= int(prefix) <= 305
+        or 310 <= int(prefix) <= 324
+        or prefix in {"333", "350", "351", "352", "308"}
+    ) if prefix.isdigit() else False
+    if len(digits) == 10 and (prefix in {"601", "602", "604", "605", "606", "607", "608"} or valid_mobile):
         return "+57" + digits
     return digits
 

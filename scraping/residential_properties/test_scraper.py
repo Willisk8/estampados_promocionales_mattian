@@ -18,6 +18,7 @@ class NormalizationTests(unittest.TestCase):
             "admin@ejemplo.com",
         )
         self.assertEqual(normalize_phone("Tel: 601 8220136"), "601 8220136")
+        self.assertEqual(normalize_phone("Tel: 603 8220136"), "8220136")
 
     def test_residential_classification(self):
         self.assertEqual(

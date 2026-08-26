@@ -1,0 +1,4 @@
+interface:
+  display_name: "Calidad de datos Estampados"
+  short_description: "Normaliza y audita datos colombianos"
+  default_prompt: "Usa $estampados-data-quality para auditar y normalizar estas bases antes de importarlas."

@@ -67,7 +67,7 @@ def now_iso() -> str:
 def clean(value: Any) -> str:
     if value is None:
         return ""
-    return re.sub(r"\s+", " ", str(value)).strip()
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFC", str(value))).strip()
 
 
 def html_text(value: Any) -> str:

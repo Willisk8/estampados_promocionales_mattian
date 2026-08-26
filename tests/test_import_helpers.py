@@ -9,10 +9,13 @@ sys.path.insert(0, str(ROOT / "scripts" / "import"))
 
 from _shared import clean_record, validate_database_role  # noqa: E402
 from import_entidades import (  # noqa: E402
+    classify_colombian_phone,
     is_valid_email,
     is_malformed_email_domain,
+    normalize_colombian_phone,
     normalize_contact_record,
     prepare_contact_records,
+    sanitize_visible_text,
 )
 
 
@@ -38,8 +41,37 @@ class ImportHelperTests(unittest.TestCase):
             "estado": "ACTIVE",
         }])
         self.assertEqual(record["estado"], "INVALID")
-        self.assertEqual(record["valor_normalizado"], "correo invalido")
+        self.assertEqual(record["valor_normalizado"], "Correo Invalido")
         self.assertEqual(record["__raw_payload"]["valor_normalizado"], " Correo Invalido ")
+
+    def test_visible_text_and_colombian_phone_sanitization(self):
+        self.assertEqual(
+            sanitize_visible_text('  "Organización"\n de   Bogotá  '),
+            '"Organización" de Bogotá',
+        )
+        self.assertEqual(
+            normalize_colombian_phone("+57 (601) 234-5678"),
+            "6012345678",
+        )
+        self.assertEqual(
+            normalize_colombian_phone("0057 320 123 4567"),
+            "3201234567",
+        )
+        self.assertEqual(classify_colombian_phone("6027654321"), "FIJO")
+        self.assertEqual(classify_colombian_phone("6037654321"), "INVALIDO")
+        self.assertEqual(classify_colombian_phone("3117654321"), "CELULAR")
+        self.assertEqual(classify_colombian_phone("2117654321"), "INVALIDO")
+
+        [record] = prepare_contact_records([{
+            "id_canal_contacto": "00000000-0000-4000-b000-000000000099",
+            "tipo": "TELEFONO",
+            "valor_original": "123 45",
+            "valor_normalizado": "123 45",
+            "estado": "ACTIVE",
+        }])
+        self.assertEqual(record["valor_normalizado"], "12345")
+        self.assertEqual(record["estado"], "INVALID")
+        self.assertIn("Telefono colombiano requiere revision", record["__review_reason"])
 
     def test_known_malformed_domains_are_quarantined(self):
         malformed_domains = (
@@ -70,7 +102,7 @@ class ImportHelperTests(unittest.TestCase):
         normalized = normalize_contact_record(clean_record(raw))
         self.assertNotEqual(json.dumps(raw, sort_keys=True), json.dumps(normalized, sort_keys=True))
         self.assertEqual(normalized["tipo"], "EMAIL")
-        self.assertEqual(normalized["valor_normalizado"], "ventas@example.com")
+        self.assertEqual(normalized["valor_normalizado"], "VENTAS@example.com")
 
 
 if __name__ == "__main__":
