@@ -6,6 +6,10 @@
 .env.*.local
 *.env
 
+# Credenciales de la cuenta de prueba QA E2E — NUNCA en Git
+.qa_test_account_password
+.qa_test_account_user_id
+
 # Credenciales y secretos
 secrets/
 *.pem
