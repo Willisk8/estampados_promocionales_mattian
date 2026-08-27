@@ -1,8 +1,10 @@
 # Reporte de calidad de datos - Supabase STAGING
 
-Fecha de corte: 2026-08-25
+Fecha de corte: 2026-08-25, con actualización operativa 2026-08-26
 
-Base evaluada: Supabase STAGING, migraciones `000` a `015`, cargas piloto y full de entidades/catalogo.
+Base evaluada originalmente: Supabase STAGING, migraciones `000` a `015`, cargas piloto y full de entidades/catalogo. Este documento conserva ese corte histórico; no debe usarse para afirmar el estado actual de STAGING sin reejecutar las pruebas SQL y la auditoría de datos.
+
+Actualización 2026-08-26: la auditoría offline en `outputs/data_quality_2026-08-26_audit/` reportó 103 incidencias `ERROR` bloqueantes y 11,658 incidencias `REVIEW`. El contrato vigente del auditor es `VALID`, `REVIEW_REQUIRED`, `INVALID`; no se deben cargar filas `INVALID` y las `REVIEW_REQUIRED` requieren curación o aceptación documentada antes de automatizar cargas.
 
 ## Veredicto ejecutivo
 

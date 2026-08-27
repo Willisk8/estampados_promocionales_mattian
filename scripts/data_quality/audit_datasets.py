@@ -114,7 +114,7 @@ class Issues:
             return "INVALID"
         if "REVIEW" in levels:
             return "REVIEW_REQUIRED"
-        return "CLEAN"
+        return "VALID"
 
 
 class DivipolaMatcher:

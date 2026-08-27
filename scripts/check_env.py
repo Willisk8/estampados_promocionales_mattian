@@ -14,10 +14,10 @@ from pathlib import Path
 # ENVIRONMENT vale 'staging' (7 caracteres) y se valida por pertenencia, no
 # por tamaño. Un mínimo global de 10 la marcaba como inválida siempre.
 REQUIRED_VARS = [
-    ("SUPABASE_URL", "Supabase Dashboard → Settings → API → Project URL", 10),
-    ("SUPABASE_ANON_KEY", "Supabase Dashboard → Settings → API → anon / publishable", 10),
-    ("SUPABASE_SERVICE_ROLE_KEY", "Supabase Dashboard → Settings → API → service_role", 10),
-    ("DATABASE_URL", "Supabase Dashboard → Settings → Database → Connection string", 10),
+    ("SUPABASE_URL", "Supabase Dashboard -> Settings -> API -> Project URL", 10),
+    ("SUPABASE_ANON_KEY", "Supabase Dashboard -> Settings -> API -> anon / publishable", 10),
+    ("SUPABASE_SERVICE_ROLE_KEY", "Supabase Dashboard -> Settings -> API -> service_role", 10),
+    ("DATABASE_URL", "Supabase Dashboard -> Settings -> Database -> Connection string", 10),
     ("HMAC_SUPPRESSION_SECRET", "Generar: python -c \"import secrets; print(secrets.token_hex(32))\"", 32),
     ("ENVIRONMENT", "Debe ser 'staging' o 'production'", 0),
 ]

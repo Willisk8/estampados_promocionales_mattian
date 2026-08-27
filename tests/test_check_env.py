@@ -81,6 +81,13 @@ class CheckEnvTests(unittest.TestCase):
         _, warnings = check_env(env)
         self.assertTrue(any("PRODUCCION" in w for w in warnings))
 
+    def test_mensajes_de_error_son_imprimibles_en_cp1252(self):
+        env = entorno_valido()
+        del env["DATABASE_URL"]
+        errors, warnings = check_env(env)
+        salida = "\n".join([*errors, *warnings])
+        salida.encode("cp1252")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -15,9 +15,21 @@ from scripts.data_quality.normalization import (  # noqa: E402
     normalize_text,
     search_key,
 )
+from scripts.data_quality.audit_datasets import Issues  # noqa: E402
 
 
 class ColombiaDataQualityTests(unittest.TestCase):
+    def test_issue_status_contract_uses_valid_review_required_invalid(self):
+        issues = Issues()
+
+        self.assertEqual(issues.status("dataset", "ok"), "VALID")
+
+        issues.add("dataset", "review", "campo", "REVISION", "REVIEW")
+        self.assertEqual(issues.status("dataset", "review"), "REVIEW_REQUIRED")
+
+        issues.add("dataset", "invalid", "campo", "ERROR", "ERROR")
+        self.assertEqual(issues.status("dataset", "invalid"), "INVALID")
+
     def test_canonical_text_preserves_accents_and_search_key_folds_them(self):
         self.assertEqual(normalize_text('  "Organización\nÚnica"  '), "Organización Única")
         self.assertEqual(search_key("Organización Única"), "organizacion_unica")

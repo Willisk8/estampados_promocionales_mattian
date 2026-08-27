@@ -1,11 +1,14 @@
 # Plan de separación STAGING / PROD
 
-Fecha de corte: 2026-08-25
+Fecha de corte: 2026-08-26
 
 ## Estado actual
 
-El repositorio tiene dos ramas (`staging` y `master`), pero actualmente ambas
-apuntan al mismo commit y solo existe despliegue automático a Supabase STAGING.
+El repositorio tiene dos ramas (`staging` y `master`). `staging` es la rama
+desplegable a Supabase STAGING; `master` puede adelantarse mientras haya
+cambios pendientes de promover. No asumir que ambas ramas apuntan al mismo
+commit: verificar con `git fetch` y `git rev-list --left-right --count
+origin/staging...origin/master` antes de promover.
 
 Esto es intencional mientras el piloto no esté listo para producción, pero no
 debe confundirse con una separación PROD completa.
