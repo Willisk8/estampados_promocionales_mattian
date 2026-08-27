@@ -403,10 +403,16 @@ section > h2 {
     align-items: stretch;
   }
 
-  input,
-  select,
-  button {
+  .filtros input,
+  .filtros select,
+  .filtros button {
     flex: 1 1 180px;
+  }
+
+  .centro form > input,
+  .centro form > button {
+    flex: 1 1 auto;
+    width: 100%;
   }
 
   table {

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
+import { rutaInternaSegura } from "@/lib/rutas-internas";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function PaginaLogin({
 
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
-    const siguiente = String(formData.get("siguiente") ?? "/");
+    const siguiente = rutaInternaSegura(formData.get("siguiente"), "/");
 
     const supabase = await crearClienteServidor();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -26,7 +27,7 @@ export default async function PaginaLogin({
       redirect("/login?error=credenciales");
     }
 
-    redirect(siguiente.startsWith("/") ? siguiente : "/");
+    redirect(siguiente);
   }
 
   return (
@@ -41,7 +42,7 @@ export default async function PaginaLogin({
       )}
 
       <form action={iniciarSesion}>
-        <input type="hidden" name="siguiente" value={params.siguiente ?? "/"} />
+        <input type="hidden" name="siguiente" value={rutaInternaSegura(params.siguiente, "/")} />
         <input
           type="email"
           name="email"
