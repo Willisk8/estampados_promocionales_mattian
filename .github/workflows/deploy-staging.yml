@@ -41,4 +41,4 @@ jobs:
 
       - name: Run database tests
         shell: pwsh
-        run: ./scripts/run_db_tests.ps1
+        run: ./scripts/run_db_tests.ps1 -ConfirmStaging

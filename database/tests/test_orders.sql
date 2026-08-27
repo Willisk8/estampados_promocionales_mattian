@@ -24,6 +24,14 @@ INSERT INTO organizacion (
     'Bogota, D.C.'
 );
 
+INSERT INTO producto (id_producto, sku, nombre, estado)
+VALUES (
+    '00000000-0000-4000-b200-000000000040',
+    'TEST-PEDIDOS',
+    'Producto fixture pedidos',
+    'ACTIVE'
+);
+
 -- Cotizacion en BORRADOR: debe rechazar la conversion
 INSERT INTO cotizacion (
     id_cotizacion, id_organizacion, estado, moneda, total,
@@ -51,10 +59,14 @@ INSERT INTO cotizacion (
 INSERT INTO cotizacion_item (
     id_cotizacion, id_producto, cantidad, precio_unitario, subtotal, producto_snapshot
 )
-SELECT
-    '00000000-0000-4000-b200-000000000021', p.id_producto, 12, 7500, 90000,
-    jsonb_build_object('sku', p.sku, 'precio_unitario_congelado', 7500)
-FROM producto p LIMIT 1;
+VALUES (
+    '00000000-0000-4000-b200-000000000021',
+    '00000000-0000-4000-b200-000000000040',
+    12,
+    7500,
+    90000,
+    '{"sku":"TEST-PEDIDOS","precio_unitario_congelado":7500}'::JSONB
+);
 
 -- Pedido manual de control: sin cotizacion, origen MANUAL
 INSERT INTO pedido (
@@ -69,10 +81,14 @@ INSERT INTO pedido (
 INSERT INTO pedido_item (
     id_pedido, id_producto, cantidad, precio_unitario, subtotal, producto_snapshot
 )
-SELECT
-    '00000000-0000-4000-b200-000000000030', p.id_producto, 2, 10000, 20000,
-    jsonb_build_object('sku', p.sku)
-FROM producto p LIMIT 1;
+VALUES (
+    '00000000-0000-4000-b200-000000000030',
+    '00000000-0000-4000-b200-000000000040',
+    2,
+    10000,
+    20000,
+    '{"sku":"TEST-PEDIDOS"}'::JSONB
+);
 
 -- ----------------------------------------------------------
 -- El CHECK de origen protege la consistencia del par (origen, id_cotizacion)

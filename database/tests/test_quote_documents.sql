@@ -31,6 +31,14 @@ VALUES (
     'EMAIL', 'contacto@organizacion-docs.test', 'contacto@organizacion-docs.test'
 );
 
+INSERT INTO producto (id_producto, sku, nombre, estado)
+VALUES (
+    '00000000-0000-4000-a100-000000000040',
+    'TEST-DOCS-COTIZACION',
+    'Producto fixture documentos cotizacion',
+    'ACTIVE'
+);
+
 INSERT INTO cotizacion (
     id_cotizacion, id_organizacion, estado, moneda, total,
     creada_por, rol_consola, metodo_precio, fecha_emision
@@ -45,10 +53,14 @@ INSERT INTO cotizacion (
 INSERT INTO cotizacion_item (
     id_cotizacion, id_producto, cantidad, precio_unitario, subtotal, producto_snapshot
 )
-SELECT
-    '00000000-0000-4000-a100-000000000020', p.id_producto, 10, 7500, 75000,
-    jsonb_build_object('sku', p.sku)
-FROM producto p LIMIT 1;
+VALUES (
+    '00000000-0000-4000-a100-000000000020',
+    '00000000-0000-4000-a100-000000000040',
+    10,
+    7500,
+    75000,
+    '{"sku":"TEST-DOCS-COTIZACION"}'::JSONB
+);
 
 -- Cotizacion vencida de control (fecha_vencimiento en el pasado)
 INSERT INTO cotizacion (

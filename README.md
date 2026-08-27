@@ -9,7 +9,7 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 | Componente | Estado | Detalle |
 |---|---|---|
 | Infraestructura Supabase STAGING | ✓ Completo | Proyecto `psereyjwjpyakkmnabgm`, región us-west-2 Oregon |
-| Migraciones `000`–`053` | ⚠ Pendiente de promoción completa | 54 migraciones numeradas; deploy idempotente vía `schema_migrations`. `053` corrige upsert de imágenes en Storage y debe aplicarse en STAGING antes de reintentar importación de imágenes |
+| Migraciones `000`–`058` | ⚠ Revalidación QA en curso | 59 migraciones numeradas; deploy idempotente vía `schema_migrations`. `054`–`058` cierran redondeo, snapshots curados, preparaciones, idempotencia concurrente, cotizaciones sin técnica explícita y no heredar merma técnica cuando no se solicita técnica |
 | Motor de precios (`resolve_price`) | ✓ Operativo | Tests A–F pasando |
 | CRM — organizaciones y personas | ✓ Cargado | 5,639 organizaciones · 4,642 personas |
 | CRM — canales de contacto | ✓ Cargado | 16,211 canales (email, teléfono, WhatsApp, web) |
@@ -160,6 +160,12 @@ No usar scripts no idempotentes para migraciones. El único flujo manual soporta
 | `021_marking_technique_costs.sql` | Tablas append-only para costos de técnicas de marcación |
 | `022_import_raw_row_retention.sql` | Función de anonimización de payloads PII vencidos en `import_raw_row` |
 
+> Inventario completo y actualizado de migraciones aplicadas/versionadas:
+> [`database/migrations/CHECKSUMS.txt`](database/migrations/CHECKSUMS.txt).
+> La tabla anterior resume el bloque fundacional; las migraciones posteriores
+> agregan consola, Cliente 360, IA, seguridad, saneamiento de datos, Storage y
+> correcciones incrementales del motor de cotización.
+
 ### Convenciones obligatorias
 
 - **PKs siempre UUID**: `DEFAULT gen_random_uuid()` (requiere pgcrypto)
@@ -174,6 +180,7 @@ No usar scripts no idempotentes para migraciones. El único flujo manual soporta
 ## Correr tests
 
 ```powershell
+$env:DATABASE_URL = "postgresql://..."  # tu Postgres local, nunca STAGING
 pwsh ./scripts/run_db_tests.ps1
 ```
 
@@ -448,7 +455,7 @@ Plan maestro: [`docs/plan_trabajo_cierre_mvp.md`](docs/plan_trabajo_cierre_mvp.m
 
 | Prioridad | Tarea |
 |---|---|
-| Alta | Publicar/sincronizar migraciones `021`–`022`, catálogo MVP y plan de cierre en GitHub/rama `staging` |
+| Alta | Hacer commit atómico y sincronizar rama `staging` con migraciones `000`–`058`, seeds/tests/helpers requeridos y documentación; verificar STAGING real antes de afirmar despliegue |
 | Alta | Curar costos de técnicas de marcación para definir cuáles alimentan cálculo automático |
 | Alta | Ajustar la calculadora para usar costos versionados de proveedor y marcación |
 | Alta | Cerrar 5 productos propios MVP y probar `resolve_price()` de punta a punta |

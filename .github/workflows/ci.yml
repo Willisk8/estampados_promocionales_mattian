@@ -10,6 +10,9 @@ on:
       - master
       - staging
 
+permissions:
+  contents: read
+
 jobs:
   database-tests:
     name: Database migrations and tests
@@ -71,7 +74,7 @@ jobs:
       # ni el esquema auth. Las migraciones 011, 018, 019 y 020 los revocan sin
       # guarda, y la migracion de acceso a la consola usa auth.uid().
       - name: Bootstrap Supabase roles and auth schema
-        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/ci/bootstrap_supabase_roles.sql
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/bootstrap_supabase_roles.sql "$DATABASE_URL"
 
       - name: Verify migration runner fails closed
         shell: pwsh
@@ -80,6 +83,13 @@ jobs:
       - name: Apply migrations
         shell: pwsh
         run: ./scripts/apply_pending_migrations.ps1
+
+      # Los tests SQL ya son hermeticos, pero los evals siguen necesitando un
+      # producto base persistente porque se ejecutan despues de migraciones sobre
+      # una base limpia. Esta semilla vive fuera de database/migrations para no
+      # alterar el runner de esquema.
+      - name: Apply test seeds
+        run: psql -v ON_ERROR_STOP=1 -f database/seeds/001_producto_fixture_base.sql "$DATABASE_URL"
 
       - name: Run database tests
         shell: pwsh

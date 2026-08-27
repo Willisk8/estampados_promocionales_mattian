@@ -7,6 +7,18 @@ if ($PSVersionTable.PSVersion.Major -ge 7) {
     $PSNativeCommandUseErrorActionPreference = $true
 }
 
+<#
+    ORDEN DE ARGUMENTOS DE PSQL — no reordenar.
+    La cadena de conexion va SIEMPRE al final, despues de -v/-c/-f.
+    El getopt de Windows no permuta: en cuanto encuentra el primer argumento
+    posicional deja de interpretar opciones. Con la URL adelante, psql ignora
+    -v, -c y -f, no ejecuta nada y avisa por stderr pero sale con codigo 0.
+    Invoke-PsqlChecked solo mira el exit code, asi que el efecto es un fallo
+    silencioso que hacia que run_db_tests.ps1 informara exito sin correr un
+    solo test.
+    En Linux (el runner del CI) glibc si permuta, por eso el error no se veia.
+    Con la URL al final funciona igual en las dos plataformas.
+#>
 function Invoke-PsqlChecked {
     param(
         [Parameter(Mandatory = $true)]
@@ -56,7 +68,7 @@ try {
     }
 
     $filenameLiteral = "'" + ($badFilename -replace "'", "''") + "'"
-    $registered = & psql $DatabaseUrl -At -v ON_ERROR_STOP=1 -c "SELECT COUNT(*) FROM schema_migrations WHERE filename = $filenameLiteral;"
+    $registered = & psql -At -v ON_ERROR_STOP=1 -c "SELECT COUNT(*) FROM schema_migrations WHERE filename = $filenameLiteral;" $DatabaseUrl
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0) {
         throw "psql fallo ($exitCode): verificar que migracion invalida no fue registrada"

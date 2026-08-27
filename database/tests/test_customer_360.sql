@@ -46,6 +46,14 @@ INSERT INTO organizacion (
 INSERT INTO relacion_comercial_organizacion (id_organizacion, estado_comercial, actualizado_por)
 VALUES ('00000000-0000-4000-c300-00000000000c', 'DESCARTADO', '00000000-0000-4000-c300-000000000002');
 
+INSERT INTO producto (id_producto, sku, nombre, estado)
+VALUES (
+    '00000000-0000-4000-c300-000000000040',
+    'TEST-CLIENTE-360',
+    'Producto fixture Cliente 360',
+    'ACTIVE'
+);
+
 -- Un pedido y una cotizacion con item para calcular metricas de compra/cotizado
 INSERT INTO cotizacion (
     id_cotizacion, id_organizacion, estado, moneda, total,
@@ -60,10 +68,14 @@ INSERT INTO cotizacion (
 INSERT INTO cotizacion_item (
     id_cotizacion, id_producto, cantidad, precio_unitario, subtotal, producto_snapshot
 )
-SELECT
-    '00000000-0000-4000-c300-000000000020', p.id_producto, 10, 10000, 100000,
-    jsonb_build_object('sku', p.sku)
-FROM producto p LIMIT 1;
+VALUES (
+    '00000000-0000-4000-c300-000000000020',
+    '00000000-0000-4000-c300-000000000040',
+    10,
+    10000,
+    100000,
+    '{"sku":"TEST-CLIENTE-360"}'::JSONB
+);
 
 INSERT INTO pedido (
     id_pedido, id_organizacion, id_cotizacion, origen, subtotal, total,
@@ -77,10 +89,14 @@ INSERT INTO pedido (
 INSERT INTO pedido_item (
     id_pedido, id_producto, cantidad, precio_unitario, subtotal, producto_snapshot
 )
-SELECT
-    '00000000-0000-4000-c300-000000000030', p.id_producto, 4, 10000, 40000,
-    jsonb_build_object('sku', p.sku)
-FROM producto p LIMIT 1;
+VALUES (
+    '00000000-0000-4000-c300-000000000030',
+    '00000000-0000-4000-c300-000000000040',
+    4,
+    10000,
+    40000,
+    '{"sku":"TEST-CLIENTE-360"}'::JSONB
+);
 
 -- ----------------------------------------------------------
 -- LECTURA registra la interaccion reciente del Cliente B y C

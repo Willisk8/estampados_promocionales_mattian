@@ -87,6 +87,7 @@ También hay pruebas CRM/contactabilidad en `database/tests/test_crm_contactabil
 Se ejecutan dentro de una transacción que termina en `ROLLBACK` para no afectar datos.
 
 ```bash
+export DATABASE_URL="postgresql://..."  # tu Postgres local, nunca STAGING
 pwsh ./scripts/run_db_tests.ps1
 ```
 

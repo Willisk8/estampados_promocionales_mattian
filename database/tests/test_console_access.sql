@@ -8,6 +8,7 @@
 --   3. No puede escribir en ninguna de ellas.
 --   4. No puede tocar las tablas con PII ni las vistas de campana.
 --   5. Los correos van enmascarados salvo para ADMIN.
+--   6. Storage permite upsert de imagenes solo a ADMIN.
 --
 -- Corre dentro de una transaccion y termina en ROLLBACK.
 -- ============================================================
@@ -251,7 +252,73 @@ END;
 $$;
 
 -- ----------------------------------------------------------
--- 7. El resumen responde y cuenta lo que hay
+-- 7. Storage: upsert de imagenes limitado a ADMIN
+-- ----------------------------------------------------------
+DO $$
+DECLARE
+    v_id_storage UUID;
+    v_policy_count INT;
+    v_update_no_admin BOOLEAN := false;
+BEGIN
+    SELECT count(*) INTO v_policy_count
+      FROM pg_policies
+     WHERE schemaname = 'storage'
+       AND tablename = 'objects'
+       AND policyname = 'consola_admin_actualiza_catalogo'
+       AND cmd = 'UPDATE'
+       AND roles = ARRAY['authenticated']::name[]
+       AND qual LIKE '%catalogo-proveedor%'
+       AND qual LIKE '%fn_consola_rol()%'
+       AND with_check LIKE '%catalogo-proveedor%'
+       AND with_check LIKE '%fn_consola_rol()%';
+
+    ASSERT v_policy_count = 1,
+        'debe existir policy UPDATE de Storage limitada a bucket catalogo-proveedor y rol ADMIN';
+
+    INSERT INTO storage.objects (bucket_id, name, metadata)
+    VALUES (
+        'catalogo-proveedor',
+        'tests/admin-upsert-console-access.webp',
+        '{"contentType":"image/webp"}'::jsonb
+    )
+    RETURNING id INTO v_id_storage;
+
+    UPDATE storage.objects
+       SET metadata = '{"contentType":"image/webp","retry":true}'::jsonb
+     WHERE id = v_id_storage;
+
+    ASSERT FOUND, 'ADMIN debe poder actualizar objetos existentes del bucket catalogo-proveedor';
+
+    RESET ROLE;
+    PERFORM set_config('request.jwt.claims',
+                      '{"sub":"00000000-0000-4000-c000-000000000001"}', true);
+    SET LOCAL ROLE authenticated;
+
+    BEGIN
+        UPDATE storage.objects
+           SET metadata = '{"contentType":"image/webp","retry":"blocked"}'::jsonb
+         WHERE id = v_id_storage;
+        IF NOT FOUND THEN
+            v_update_no_admin := true;
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        v_update_no_admin := true;
+    END;
+
+    ASSERT v_update_no_admin,
+        'LECTURA no debe poder actualizar objetos existentes de Storage';
+
+    RESET ROLE;
+    PERFORM set_config('request.jwt.claims',
+                      '{"sub":"00000000-0000-4000-c000-000000000002"}', true);
+    SET LOCAL ROLE authenticated;
+
+    RAISE NOTICE 'PASSED - Storage permite upsert de imagenes solo a ADMIN';
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- 8. El resumen responde y cuenta lo que hay
 -- ----------------------------------------------------------
 DO $$
 DECLARE v_orgs BIGINT; v_canales BIGINT;
@@ -265,7 +332,7 @@ END;
 $$;
 
 -- ----------------------------------------------------------
--- 8. resolve_price sigue fuera del alcance del navegador
+-- 9. resolve_price sigue fuera del alcance del navegador
 -- ----------------------------------------------------------
 DO $$
 DECLARE v_bloqueada BOOLEAN := false;

@@ -74,6 +74,7 @@ impone RLS en PostgreSQL, no el secreto de la clave.
 ```bash
 cd web && npm run verificar          # tipos y compilacion, sin tocar el dev
 cd web && npm run check:privilegios  # la clave privilegiada no esta en el codigo
+export DATABASE_URL="postgresql://..."  # tu Postgres local, nunca STAGING
 ./scripts/run_db_tests.ps1           # incluye test_console_access.sql y test_console_actions.sql
 python scripts/audit_change.py --all # invariantes del repositorio
 ```

@@ -8,6 +8,18 @@ if ($PSVersionTable.PSVersion.Major -ge 7) {
     $PSNativeCommandUseErrorActionPreference = $true
 }
 
+<#
+    ORDEN DE ARGUMENTOS DE PSQL — no reordenar.
+    La cadena de conexion va SIEMPRE al final, despues de -v/-c/-f.
+    El getopt de Windows no permuta: en cuanto encuentra el primer argumento
+    posicional deja de interpretar opciones. Con la URL adelante, psql ignora
+    -v, -c y -f, no ejecuta nada y avisa por stderr pero sale con codigo 0.
+    Invoke-PsqlChecked solo mira el exit code, asi que el efecto es un fallo
+    silencioso que hacia que run_db_tests.ps1 informara exito sin correr un
+    solo test.
+    En Linux (el runner del CI) glibc si permuta, por eso el error no se veia.
+    Con la URL al final funciona igual en las dos plataformas.
+#>
 function Invoke-PsqlChecked {
     param(
         [Parameter(Mandatory = $true)]
@@ -80,7 +92,7 @@ if (-not $DatabaseUrl) {
 }
 
 Invoke-PsqlChecked `
-    -Arguments @($DatabaseUrl, "-v", "ON_ERROR_STOP=1", "-c", @"
+    -Arguments @("-v", "ON_ERROR_STOP=1", "-c", @"
 CREATE TABLE IF NOT EXISTS public.schema_migrations (
     filename TEXT PRIMARY KEY,
     applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -103,7 +115,7 @@ DO `$`$ BEGIN
             AS RESTRICTIVE FOR ALL USING (false);
     END IF;
 END `$`$;
-"@) `
+"@, $DatabaseUrl) `
     -Context "inicializar schema_migrations"
 
 $migrations = Get-ChildItem -LiteralPath $MigrationsDir -Filter "*.sql" |
@@ -115,8 +127,9 @@ foreach ($migration in $migrations) {
     $checksum = Get-NormalizedSha256 -Path $migration.FullName
     $checksumLiteral = ConvertTo-PsqlLiteral $checksum
 
-    $registered = & psql $DatabaseUrl -At -F "|" -v ON_ERROR_STOP=1 -c `
-        "SELECT coalesce(checksum_sha256, ''), checksum_backfilled FROM public.schema_migrations WHERE filename = $filenameLiteral;"
+    $registered = & psql -At -F "|" -v ON_ERROR_STOP=1 -c `
+        "SELECT coalesce(checksum_sha256, ''), checksum_backfilled FROM public.schema_migrations WHERE filename = $filenameLiteral;" `
+        $DatabaseUrl
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0) {
         throw "psql fallo ($exitCode): consultar schema_migrations para $filename"
@@ -163,7 +176,7 @@ COMMIT;
     Set-Content -LiteralPath $scriptPath -Value $script -Encoding UTF8
     try {
         Invoke-PsqlChecked `
-            -Arguments @($DatabaseUrl, "-v", "ON_ERROR_STOP=1", "-f", $scriptPath) `
+            -Arguments @("-v", "ON_ERROR_STOP=1", "-f", $scriptPath, $DatabaseUrl) `
             -Context "aplicar y registrar $filename"
     } finally {
         Remove-Item -LiteralPath $scriptPath -Force -ErrorAction SilentlyContinue
