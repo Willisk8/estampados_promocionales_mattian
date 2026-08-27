@@ -36,7 +36,10 @@ BEGIN
        AND pt.permitida
        AND c.usage_status = 'AUTOMATIC_PRICING'
        AND pts.verification_status = 'VERIFIED_PUBLIC_PRICE'
+       AND pts.currency = 'COP'
+       AND pts.price_value IS NOT NULL
        AND lower(COALESCE(pts.billing_unit, '')) = 'unidad'
+       AND (pts.fetched_at IS NULL OR pts.fetched_at <= now())
      ORDER BY tm.codigo;
 END;
 $function$;
