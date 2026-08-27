@@ -2,8 +2,8 @@
 -- bootstrap_supabase_roles.sql
 --
 -- Crea los objetos que Supabase provee de fabrica y que un contenedor
--- postgres limpio no tiene: los roles anon/authenticated/service_role y un
--- esquema auth minimo.
+-- postgres limpio no tiene: los roles anon/authenticated/service_role, un
+-- esquema auth minimo y las tablas basicas de storage usadas por policies.
 --
 -- POR QUE EXISTE
 -- Las migraciones 011, 018, 019 y 020 ejecutan
@@ -93,3 +93,36 @@ $$;
 GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION auth.role() TO anon, authenticated, service_role;
+
+-- ----------------------------------------------------------
+-- 3. Esquema storage minimo para probar policies
+-- ----------------------------------------------------------
+CREATE SCHEMA IF NOT EXISTS storage;
+
+CREATE TABLE IF NOT EXISTS storage.buckets (
+    id                 TEXT PRIMARY KEY,
+    name               TEXT NOT NULL,
+    public             BOOLEAN NOT NULL DEFAULT false,
+    file_size_limit    BIGINT,
+    allowed_mime_types TEXT[],
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS storage.objects (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    bucket_id       TEXT NOT NULL REFERENCES storage.buckets(id),
+    name            TEXT NOT NULL,
+    owner           UUID,
+    metadata        JSONB,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_accessed_at TIMESTAMPTZ,
+    UNIQUE (bucket_id, name)
+);
+
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON storage.buckets TO authenticated, service_role;
