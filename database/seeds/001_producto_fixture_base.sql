@@ -1,20 +1,27 @@
 -- ============================================================
 -- 001_producto_fixture_base.sql
 --
--- Siembra el producto minimo que los tests y los evals dan por sentado.
+-- Siembra el producto minimo que los evals dan por sentado.
 --
 -- POR QUE EXISTE
--- test_orders.sql, test_customer_360.sql y scripts/evals/run_evals.py arman
--- sus fixtures con:
---     INSERT INTO cotizacion_item (...) SELECT ... FROM producto p LIMIT 1;
+-- scripts/evals/run_evals.py fija su fixture con:
+--     SELECT id_producto FROM producto LIMIT 1;
+-- y aborta con "No hay ningun producto en la base" si no encuentra ninguno.
 -- Ninguna migracion siembra productos, asi que sobre una base recien migrada
--- (el contenedor postgres:16 del CI, o un Postgres local) la tabla producto
--- esta vacia, esas consultas insertan 0 filas y los tests fallan con
--- QUOTE_WITHOUT_ITEMS y "No hay ningun producto en la base".
+-- (el contenedor postgres:16 del CI, o un Postgres local) la tabla esta vacia.
 --
--- No alcanza con que otro test siembre un producto: todos los tests corren
--- dentro de BEGIN ... ROLLBACK, asi que ninguno deja filas para el siguiente.
--- Hace falta una fila commiteada antes de ejecutar la suite.
+-- Tiene que ser una fila COMMITEADA: los tests SQL corren dentro de
+-- BEGIN ... ROLLBACK, asi que ninguno puede dejar un producto sembrado para
+-- lo que venga despues.
+--
+-- ALCANCE, que cambio y conviene no volver a ampliar:
+-- test_orders.sql, test_customer_360.sql y test_quote_documents.sql tambien
+-- dependian de esta semilla —armaban sus fixtures con
+-- INSERT INTO cotizacion_item (...) SELECT ... FROM producto p LIMIT 1— y
+-- fallaban con QUOTE_WITHOUT_ITEMS sobre base vacia. Desde 759ef21 se
+-- auto-siembran y son hermeticos, que es lo correcto para un test. Esta
+-- semilla quedo solo para los evals; si un test SQL nuevo la necesita,
+-- probablemente lo que falta es que siembre su propio producto.
 --
 -- ESTO NO ES UNA MIGRACION.
 -- Vive fuera de database/migrations/ para que apply_pending_migrations.ps1 no
