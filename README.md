@@ -9,7 +9,7 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 | Componente | Estado | Detalle |
 |---|---|---|
 | Infraestructura Supabase STAGING | ✓ Completo | Proyecto `psereyjwjpyakkmnabgm`, región us-west-2 Oregon |
-| Migraciones `000`–`058` | ⚠ Revalidación QA en curso | 59 migraciones numeradas; deploy idempotente vía `schema_migrations`. `054`–`058` cierran redondeo, snapshots curados, preparaciones, idempotencia concurrente, cotizaciones sin técnica explícita y no heredar merma técnica cuando no se solicita técnica |
+| Migraciones `000`–`059` | ⚠ Revalidación QA en curso | 60 migraciones numeradas; deploy idempotente vía `schema_migrations`. `054`–`059` cierran redondeo, snapshots curados, preparaciones, idempotencia concurrente, cotizaciones sin técnica explícita, no heredar merma técnica cuando no se solicita técnica y conflicto de `idempotency_key` con payload distinto |
 | Motor de precios (`resolve_price`) | ✓ Operativo | Tests A–F pasando |
 | CRM — organizaciones y personas | ✓ Cargado | 5,639 organizaciones · 4,642 personas |
 | CRM — canales de contacto | ✓ Cargado | 16,211 canales (email, teléfono, WhatsApp, web) |
@@ -455,7 +455,7 @@ Plan maestro: [`docs/plan_trabajo_cierre_mvp.md`](docs/plan_trabajo_cierre_mvp.m
 
 | Prioridad | Tarea |
 |---|---|
-| Alta | Hacer commit atómico y sincronizar rama `staging` con migraciones `000`–`058`, seeds/tests/helpers requeridos y documentación; verificar STAGING real antes de afirmar despliegue |
+| Alta | Hacer commit atómico y sincronizar rama `staging` con migraciones `000`–`059`, seeds/tests/helpers requeridos y documentación; verificar STAGING real antes de afirmar despliegue |
 | Alta | Curar costos de técnicas de marcación para definir cuáles alimentan cálculo automático |
 | Alta | Ajustar la calculadora para usar costos versionados de proveedor y marcación |
 | Alta | Cerrar 5 productos propios MVP y probar `resolve_price()` de punta a punta |
