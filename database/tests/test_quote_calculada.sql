@@ -130,6 +130,42 @@ $$;
 
 RESET ROLE;
 
+-- Producto con todos los costos en su default de 0 (permitido por el
+-- esquema de costo_producto, 006), sin tecnica ni transporte: el nucleo
+-- de calculo no genera ninguna fila de componente pese a que politica y
+-- costo vigente si se resolvieron. Cubre la guarda NO_COMPONENTS agregada
+-- en 062 mas alla del brief original (self-review): sin este test, un
+-- cambio futuro que renombrara la clave 'policy_id' dentro de metadata
+-- podria romper esa guarda en silencio.
+INSERT INTO producto (id_producto, sku, nombre, estado)
+VALUES ('00000000-0000-4000-fd00-000000000008', 'TEST-CALC-ZERO', 'Producto costo cero', 'ACTIVE');
+
+INSERT INTO costo_producto (id_costo, id_producto, id_variante, costo_base, costo_personalizacion, costo_empaque, otros_costos, moneda, vigencia)
+VALUES ('00000000-0000-4000-fd00-000000000009', '00000000-0000-4000-fd00-000000000008', NULL, 0, 0, 0, 0, 'COP', '[2026-01-01 00:00:00+00, 2027-01-01 00:00:00+00)'::TSTZRANGE);
+
+SELECT set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-fd00-000000000001"}', true);
+SET LOCAL ROLE authenticated;
+
+DO $$
+DECLARE r RECORD; v_count_antes INTEGER; v_count_despues INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO v_count_antes FROM cotizacion;
+
+    SELECT * INTO r FROM fn_consola_crear_cotizacion_calculada(
+        p_id_producto => '00000000-0000-4000-fd00-000000000008',
+        p_cantidad => 10
+    );
+    ASSERT r.status = 'NO_COMPONENTS', format('esperaba NO_COMPONENTS, obtuve %s', r.status);
+
+    SELECT COUNT(*) INTO v_count_despues FROM cotizacion;
+    ASSERT v_count_despues = v_count_antes, 'NO_COMPONENTS no debe crear cotizacion';
+
+    RAISE NOTICE 'PASSED - producto con costos en cero devuelve NO_COMPONENTS sin crear nada';
+END;
+$$;
+
+RESET ROLE;
+
 -- Override de margen debajo del minimo: COMERCIAL bloqueado, ADMIN permitido.
 -- Mismo motivo que arriba: estas dos tablas tambien son RLS deny_all +
 -- REVOKE ALL FROM authenticated, asi que se insertan en rol superusuario.
