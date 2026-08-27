@@ -116,6 +116,18 @@ BEGIN
       FROM tmp_componentes_calculados
      LIMIT 1;
 
+    -- costo_producto no exige costo_base > 0 (006): un producto con todos
+    -- los costos en su default de 0, sin tecnica ni transporte, hace que
+    -- el nucleo devuelva cero filas pese a que la politica y el costo
+    -- vigente si se resolvieron. Sin esta guarda, v_id_policy quedaria
+    -- NULL y el INSERT de mas abajo reventaria contra
+    -- ck_cotizacion_margen_versionado (040) con un error crudo en vez de
+    -- un status de negocio controlado.
+    IF v_id_policy IS NULL THEN
+        RETURN QUERY SELECT NULL::UUID, NULL::BIGINT, NULL::NUMERIC, 'NO_COMPONENTS'::TEXT;
+        RETURN;
+    END IF;
+
     IF p_margen_override_pct IS NOT NULL THEN
         SELECT MAX(minimum_pct) INTO v_max_minimum FROM tmp_componentes_calculados;
         v_below_minimum := p_margen_override_pct < v_max_minimum;
