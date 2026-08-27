@@ -49,6 +49,43 @@ INSERT INTO tecnica_marcacion (
     'TECHNICAL_REFERENCE'
 );
 
+INSERT INTO proveedor_tecnica_marcacion (
+    id_proveedor_tecnica, source_id, nombre
+) VALUES (
+    '00000000-0000-4000-f100-000000000006',
+    'fixture_quote_tech_provider',
+    'Proveedor tecnica quote fixture'
+);
+
+INSERT INTO precio_tecnica_marcacion_snapshot (
+    id_snapshot, id_tecnica, id_proveedor_tecnica, observation_id,
+    service_component, price_scope, billing_unit, currency, price_value,
+    quantity_min, quantity_max, fetched_at, verification_status
+) VALUES (
+    '00000000-0000-4000-f100-000000000007',
+    '00000000-0000-4000-f100-000000000002',
+    '00000000-0000-4000-f100-000000000006',
+    'fixture-quote-sublimacion-unit-2026-08-15',
+    'marcacion',
+    'solo_marcacion',
+    'unidad',
+    'COP',
+    3500,
+    1,
+    999,
+    '2026-08-15 00:00:00+00'::TIMESTAMPTZ,
+    'VERIFIED_PUBLIC_PRICE'
+);
+
+INSERT INTO curacion_precio_tecnica_marcacion (
+    id_snapshot, usage_status, formula_code, usage_notes
+) VALUES (
+    '00000000-0000-4000-f100-000000000007',
+    'AUTOMATIC_PRICING',
+    'unit_fixture',
+    'Fixture automatico unitario para quote engine'
+);
+
 INSERT INTO costo_producto (
     id_costo, id_producto, id_variante, costo_base, costo_personalizacion,
     costo_empaque, otros_costos, moneda, vigencia
@@ -66,7 +103,8 @@ INSERT INTO costo_producto (
 
 INSERT INTO producto_tecnica (
     id_producto_tecnica, id_producto, id_variante, id_tecnica,
-    cantidad_minima_tecnica, cantidad_recomendada, configuracion_estandar, merma_pct
+    cantidad_minima_tecnica, cantidad_recomendada, configuracion_estandar,
+    merma_pct, costo_preparacion, moneda_preparacion
 ) VALUES (
     '00000000-0000-4000-f100-000000000004',
     '00000000-0000-4000-f100-000000000001',
@@ -75,7 +113,32 @@ INSERT INTO producto_tecnica (
     1,
     12,
     '{"tecnica":"sublimacion","caras":1,"disenos":1,"transporte":false}'::JSONB,
-    3
+    3,
+    200,
+    'COP'
+);
+
+INSERT INTO producto (id_producto, sku, nombre, estado)
+VALUES (
+    '00000000-0000-4000-f100-000000000008',
+    'TEST-QUOTE-ROUNDING',
+    'Producto test quote rounding',
+    'ACTIVE'
+);
+
+INSERT INTO costo_producto (
+    id_costo, id_producto, id_variante, costo_base, costo_personalizacion,
+    costo_empaque, otros_costos, moneda, vigencia
+) VALUES (
+    '00000000-0000-4000-f100-000000000009',
+    '00000000-0000-4000-f100-000000000008',
+    NULL,
+    101,
+    0,
+    0,
+    0,
+    'COP',
+    '[2026-01-01 00:00:00+00, 2027-01-01 00:00:00+00)'::TSTZRANGE
 );
 
 -- ----------------------------------------------------------
@@ -114,6 +177,8 @@ SET LOCAL ROLE authenticated;
 DO $$
 DECLARE
     v_producto_component RECORD;
+    v_marcacion_component RECORD;
+    v_preparacion_component RECORD;
     v_transporte_component RECORD;
     v_components INTEGER;
 BEGIN
@@ -140,6 +205,48 @@ BEGIN
         'Costo producto con merma esperado 721000';
     ASSERT v_producto_component.precio_resultante = 1030000,
         'Margen 30% sobre 721000 esperado 1030000';
+
+    SELECT *
+      INTO v_marcacion_component
+      FROM fn_calculate_quote_components(
+          '00000000-0000-4000-f100-000000000001',
+          NULL,
+          100,
+          '00000000-0000-4000-f100-000000000002',
+          1,
+          25000,
+          'MVP_DEFAULT',
+          '2026-08-15 00:00:00+00'::TIMESTAMPTZ,
+          'COP'
+      )
+      WHERE tipo_componente = 'MARCACION';
+
+    ASSERT v_marcacion_component.costo_unitario = 3500,
+        'Marcacion debe usar costo unitario curado 3500, obtuvo ' || v_marcacion_component.costo_unitario::TEXT;
+    ASSERT v_marcacion_component.source_type = 'PRECIO_TECNICA_SNAPSHOT',
+        'Marcacion debe trazar PRECIO_TECNICA_SNAPSHOT, obtuvo ' || COALESCE(v_marcacion_component.source_type, 'NULL');
+    ASSERT v_marcacion_component.source_snapshot_id = '00000000-0000-4000-f100-000000000007',
+        'Marcacion debe trazar el snapshot curado';
+
+    SELECT *
+      INTO v_preparacion_component
+      FROM fn_calculate_quote_components(
+          '00000000-0000-4000-f100-000000000001',
+          NULL,
+          100,
+          '00000000-0000-4000-f100-000000000002',
+          5,
+          25000,
+          'MVP_DEFAULT',
+          '2026-08-15 00:00:00+00'::TIMESTAMPTZ,
+          'COP'
+      )
+      WHERE tipo_componente = 'PREPARACION';
+
+    ASSERT v_preparacion_component.cantidad = 5,
+        'Preparacion debe multiplicar por numero_preparaciones';
+    ASSERT v_preparacion_component.costo_total = 1000,
+        'Cinco preparaciones x 200 deben costar 1000';
 
     SELECT *
       INTO v_transporte_component
@@ -173,10 +280,170 @@ BEGIN
       )
       WHERE status = 'OK';
 
-    ASSERT v_components = 5,
-        'Debe devolver PRODUCTO, MARCACION, EMPAQUE, OTRO y TRANSPORTE';
+    ASSERT v_components = 6,
+        'Debe devolver PRODUCTO, MARCACION, PREPARACION, EMPAQUE, OTRO y TRANSPORTE';
 
     RAISE NOTICE 'PASSED - quote component calculation';
+END;
+$$;
+
+RESET ROLE;
+
+DO $$
+DECLARE
+    v_preparacion_component RECORD;
+BEGIN
+    SELECT *
+      INTO v_preparacion_component
+      FROM fn_calculate_quote_components(
+          '00000000-0000-4000-f100-000000000001',
+          NULL,
+          100,
+          '00000000-0000-4000-f100-000000000002',
+          5,
+          25000,
+          'MVP_DEFAULT',
+          '2026-08-15 00:00:00+00'::TIMESTAMPTZ,
+          'COP'
+      )
+      WHERE tipo_componente = 'PREPARACION';
+
+    INSERT INTO cotizacion (
+        id_cotizacion, id_organizacion, estado, moneda, total, creada_por, rol_consola
+    ) VALUES (
+        '00000000-0000-4000-f100-000000000010',
+        NULL,
+        'EMITIDA',
+        'COP',
+        1,
+        '00000000-0000-4000-f200-000000000001',
+        'ADMIN'
+    );
+
+    INSERT INTO cotizacion_item (
+        id_cotizacion_item, id_cotizacion, id_producto, id_variante, producto_snapshot,
+        cantidad, precio_unitario, subtotal, moneda
+    ) VALUES (
+        '00000000-0000-4000-f100-000000000011',
+        '00000000-0000-4000-f100-000000000010',
+        '00000000-0000-4000-f100-000000000001',
+        NULL,
+        '{}'::JSONB,
+        1,
+        1,
+        1,
+        'COP'
+    );
+
+    INSERT INTO cotizacion_componente (
+        id_cotizacion_item, tipo_componente, descripcion, cantidad,
+        costo_unitario, costo_total, pricing_method, margen_aplicado_pct,
+        precio_resultante, source_type, source_snapshot_id, metadata
+    )
+    VALUES (
+        '00000000-0000-4000-f100-000000000011',
+        v_preparacion_component.tipo_componente,
+        v_preparacion_component.descripcion,
+        v_preparacion_component.cantidad,
+        v_preparacion_component.costo_unitario,
+        v_preparacion_component.costo_total,
+        v_preparacion_component.pricing_method,
+        v_preparacion_component.margen_aplicado_pct,
+        v_preparacion_component.precio_resultante,
+        v_preparacion_component.source_type,
+        v_preparacion_component.source_snapshot_id,
+        v_preparacion_component.metadata
+    );
+
+    ASSERT FOUND, 'Debe poder persistir PREPARACION con source_type PRODUCTO_TECNICA';
+    RAISE NOTICE 'PASSED - PREPARACION persistible como PRODUCTO_TECNICA';
+END;
+$$;
+
+SELECT set_config('request.jwt.claims',
+                  '{"sub":"00000000-0000-4000-f200-000000000001"}', true);
+SET LOCAL ROLE authenticated;
+
+DO $$
+DECLARE
+    v_producto_component RECORD;
+    v_preparacion_component RECORD;
+    v_status TEXT;
+BEGIN
+    SELECT *
+      INTO v_producto_component
+      FROM fn_calculate_quote_components(
+          '00000000-0000-4000-f100-000000000001',
+          NULL,
+          100,
+          NULL,
+          5,
+          0,
+          'MVP_DEFAULT',
+          '2026-08-15 00:00:00+00'::TIMESTAMPTZ,
+          'COP'
+      )
+      WHERE tipo_componente = 'PRODUCTO';
+
+    ASSERT v_producto_component.cantidad = 100,
+        'Sin tecnica explicita no debe heredar merma de producto_tecnica; cantidad esperada 100';
+    ASSERT (v_producto_component.metadata ->> 'merma_pct')::NUMERIC = 0,
+        'Sin tecnica explicita metadata.merma_pct debe ser 0';
+
+    SELECT *
+      INTO v_preparacion_component
+      FROM fn_calculate_quote_components(
+          '00000000-0000-4000-f100-000000000001',
+          NULL,
+          100,
+          NULL,
+          5,
+          0,
+          'MVP_DEFAULT',
+          '2026-08-15 00:00:00+00'::TIMESTAMPTZ,
+          'COP'
+      )
+      WHERE tipo_componente = 'PREPARACION';
+
+    ASSERT v_preparacion_component IS NULL,
+        'Sin tecnica explicita no debe materializar PREPARACION de una tecnica cualquiera';
+
+    SELECT *
+      INTO v_producto_component
+      FROM fn_calculate_quote_components(
+          '00000000-0000-4000-f100-000000000008',
+          NULL,
+          1,
+          NULL,
+          0,
+          0,
+          'MVP_DEFAULT',
+          '2026-08-15 00:00:00+00'::TIMESTAMPTZ,
+          'COP'
+      )
+      WHERE tipo_componente = 'PRODUCTO';
+
+    ASSERT v_producto_component.precio_resultante = 200,
+        'UP_100 debe redondear producto 101 con margen 30% de 144.29 a 200';
+
+    SELECT status
+      INTO v_status
+      FROM fn_calculate_quote_components(
+          '00000000-0000-4000-f100-000000000001',
+          NULL,
+          100,
+          '00000000-0000-4000-f100-000000000002',
+          -3,
+          0,
+          'MVP_DEFAULT',
+          '2026-08-15 00:00:00+00'::TIMESTAMPTZ,
+          'COP'
+      );
+
+    ASSERT v_status = 'INVALID_PREPARATION_COUNT',
+        'Preparaciones negativas deben devolver INVALID_PREPARATION_COUNT';
+
+    RAISE NOTICE 'PASSED - rounding and preparation validation regressions';
 END;
 $$;
 
