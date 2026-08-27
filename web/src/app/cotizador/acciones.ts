@@ -10,6 +10,7 @@ export async function crearCotizacionSimple(formData: FormData) {
   const idOrganizacionRaw = String(formData.get("id_organizacion") ?? "");
   const cantidad = Number(formData.get("cantidad") ?? 0);
   const notas = String(formData.get("notas") ?? "");
+  const idempotencyKey = String(formData.get("idempotency_key") ?? "");
 
   const supabase = await crearClienteServidor();
   const { data, error } = await supabase.rpc("fn_consola_crear_cotizacion_simple", {
@@ -19,6 +20,7 @@ export async function crearCotizacionSimple(formData: FormData) {
     p_cantidad: cantidad,
     p_moneda: "COP",
     p_notas: notas || null,
+    p_idempotency_key: idempotencyKey || null,
   });
 
   revalidatePath("/cotizador");

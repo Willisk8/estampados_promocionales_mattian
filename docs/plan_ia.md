@@ -18,9 +18,14 @@ con cada respuesta auditada y con evals que detecten regresiones.
 escritura real para llamadores sin autenticar, ajeno a Cliente 360 pero
 descubierto en el proceso. Se corrigió de inmediato en
 `046_close_anon_execute_and_null_role_bypass.sql` y
-`047_close_authenticated_default_grant_on_ai_helpers.sql`. **Los números de
-migración de la Fase 8 se corren en dos: `048_marketing_campaign_tracking.sql`**
-en vez de `046`. Detalle completo en el log de sesión del proyecto.
+`047_close_authenticated_default_grant_on_ai_helpers.sql`. Después se agregaron
+las migraciones 048–059 para correcciones de IA, costos, saneamiento, Storage,
+idempotencia y motor de cotización (059 cierra un hallazgo de `ingeniero-qa`
+sobre la propia idempotencia: reusar la clave con un payload distinto ahora
+marca `CONFLICT` en vez de devolver la cotización vieja en silencio).
+**La Fase 8 debe usar siempre el siguiente número disponible**; en el estado
+actual del repo, si no entra otra migración antes, sería
+`060_marketing_campaign_tracking.sql`.
 
 ### Decisiones fijadas
 
@@ -291,8 +296,14 @@ acaba de construirse.
 ---
 
 ## Fase 8 — Campañas, atribución y frecuencia
-**`048_marketing_campaign_tracking.sql`** (renumerada: 046 y 047 se usaron
-para el hallazgo de seguridad de la Fase 6, ver adenda en Contexto)
+**Usar siempre el siguiente número disponible; no fijar número hasta el momento
+de implementar.** En el corte actual ya están ocupadas las migraciones `000`–`059`;
+si no aparece otra migración antes, la siguiente sería `060_marketing_campaign_tracking.sql`.
+
+Las fases 0–7 ya fueron implementadas por las migraciones 040–045 y por los
+artefactos de eval/UI asociados. Las migraciones 046–059 quedaron ocupadas por
+correcciones posteriores de seguridad, IA, datos, Storage, motor de cotización,
+idempotencia y hermeticidad operativa; no reutilizar esos números.
 
 **Deliberadamente al final.** Gate 1 sigue bloqueante: toda contactabilidad es
 `DESCONOCIDA`, luego hoy hay cero canales elegibles.

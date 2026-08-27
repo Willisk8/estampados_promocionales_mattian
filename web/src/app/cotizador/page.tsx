@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
 import { SinAcceso } from "@/componentes/sin-acceso";
 import { crearCotizacionSimple } from "./acciones";
@@ -73,6 +74,7 @@ export default async function PaginaCotizador({
     created_at: string;
   }>;
   const puedeCotizar = sesion.rol === "ADMIN" || sesion.rol === "COMERCIAL";
+  const idempotencyKey = randomUUID();
 
   return (
     <>
@@ -102,6 +104,7 @@ export default async function PaginaCotizador({
           snapshot del producto, precio y cantidad.
         </p>
         <form action={crearCotizacionSimple} className="filtros">
+          <input type="hidden" name="idempotency_key" value={idempotencyKey} />
           <select name="id_organizacion" defaultValue="" disabled={!puedeCotizar}>
             <option value="">Sin organizacion asociada</option>
             {organizaciones.map((o) => (
