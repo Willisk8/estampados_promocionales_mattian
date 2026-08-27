@@ -9,7 +9,7 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 | Componente | Estado | Detalle |
 |---|---|---|
 | Infraestructura Supabase STAGING | ✓ Completo | Proyecto `psereyjwjpyakkmnabgm`, región us-west-2 Oregon |
-| Migraciones `000`–`022` | ✓ Aplicadas/pendientes de deploy | 23 migraciones numeradas; deploy idempotente vía `schema_migrations` |
+| Migraciones `000`–`053` | ⚠ Pendiente de promoción completa | 54 migraciones numeradas; deploy idempotente vía `schema_migrations`. `053` corrige upsert de imágenes en Storage y debe aplicarse en STAGING antes de reintentar importación de imágenes |
 | Motor de precios (`resolve_price`) | ✓ Operativo | Tests A–F pasando |
 | CRM — organizaciones y personas | ✓ Cargado | 5,639 organizaciones · 4,642 personas |
 | CRM — canales de contacto | ✓ Cargado | 16,211 canales (email, teléfono, WhatsApp, web) |
@@ -103,6 +103,11 @@ cp .env.example .env.staging
 
 > `.env.staging` está en `.gitignore` y **nunca debe commitearse**.
 > `HMAC_SUPPRESSION_SECRET` tampoco debe vivir en PostgreSQL ni en Git.
+
+> Corrección manual pendiente detectada en auditoría 2026-08-26: `.env.staging`
+> debe tener `SUPABASE_ANON_KEY` con clave publicable y
+> `SUPABASE_SERVICE_ROLE_KEY` con una clave secreta real de `service_role`.
+> No versionar ni copiar estos valores en documentación, issues o commits.
 
 ### Importante — pooler de Supabase
 
