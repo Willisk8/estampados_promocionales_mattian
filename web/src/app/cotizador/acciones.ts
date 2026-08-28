@@ -4,23 +4,68 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
 
-export async function crearCotizacionSimple(formData: FormData) {
-  const seleccion = String(formData.get("producto_variante") ?? "");
-  const [idProducto, idVarianteRaw = ""] = seleccion.split("|");
-  const idOrganizacionRaw = String(formData.get("id_organizacion") ?? "");
-  const cantidad = Number(formData.get("cantidad") ?? 0);
-  const notas = String(formData.get("notas") ?? "");
-  const idempotencyKey = String(formData.get("idempotency_key") ?? "");
+const leerTexto = (formData: FormData, campo: string) => {
+  const valor = String(formData.get(campo) ?? "").trim();
+  return valor || null;
+};
+
+const leerNumero = (formData: FormData, campo: string) => {
+  const valor = String(formData.get(campo) ?? "").trim();
+  if (!valor) return null;
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? numero : null;
+};
+
+export async function prepararCotizacionCalculada(formData: FormData) {
+  const params = new URLSearchParams();
+  const idProducto = leerTexto(formData, "id_producto");
+  const idVariante = leerTexto(formData, "id_variante");
+  const cantidad = leerNumero(formData, "cantidad");
+  const idOrganizacion = leerTexto(formData, "id_organizacion");
+  const numeroPreparaciones = leerNumero(formData, "numero_preparaciones");
+  const transporteTotal = leerNumero(formData, "transporte_total");
+  const margenOverride = leerNumero(formData, "margen_override_pct");
+  const notas = leerTexto(formData, "notas");
+
+  if (idProducto) params.set("id_producto", idProducto);
+  if (idVariante) params.set("id_variante", idVariante);
+  if (cantidad) params.set("cantidad", String(cantidad));
+  if (idOrganizacion) params.set("id_organizacion", idOrganizacion);
+  if (numeroPreparaciones !== null) {
+    params.set("numero_preparaciones", String(numeroPreparaciones));
+  }
+  if (transporteTotal !== null) params.set("transporte_total", String(transporteTotal));
+  if (margenOverride !== null) params.set("margen_override_pct", String(margenOverride));
+  if (notas) params.set("notas", notas);
+
+  redirect(`/cotizador?${params.toString()}`);
+}
+
+export async function crearCotizacionCalculada(formData: FormData) {
+  const idProducto = leerTexto(formData, "id_producto");
+  const idVariante = leerTexto(formData, "id_variante");
+  const idOrganizacion = leerTexto(formData, "id_organizacion");
+  const cantidad = leerNumero(formData, "cantidad") ?? 0;
+  const idTecnica = leerTexto(formData, "id_tecnica");
+  const numeroPreparaciones = leerNumero(formData, "numero_preparaciones") ?? 1;
+  const transporteTotal = leerNumero(formData, "transporte_total") ?? 0;
+  const margenOverride = leerNumero(formData, "margen_override_pct");
+  const notas = leerTexto(formData, "notas");
+  const idempotencyKey = leerTexto(formData, "idempotency_key");
 
   const supabase = await crearClienteServidor();
-  const { data, error } = await supabase.rpc("fn_consola_crear_cotizacion_simple", {
-    p_id_organizacion: idOrganizacionRaw || null,
+  const { data, error } = await supabase.rpc("fn_consola_crear_cotizacion_calculada", {
     p_id_producto: idProducto,
-    p_id_variante: idVarianteRaw || null,
     p_cantidad: cantidad,
-    p_moneda: "COP",
-    p_notas: notas || null,
-    p_idempotency_key: idempotencyKey || null,
+    p_id_organizacion: idOrganizacion,
+    p_id_variante: idVariante,
+    p_id_tecnica: idTecnica,
+    p_numero_preparaciones: numeroPreparaciones,
+    p_transporte_total: transporteTotal,
+    p_policy_code: "MVP_DEFAULT",
+    p_margen_override_pct: margenOverride,
+    p_notas: notas,
+    p_idempotency_key: idempotencyKey,
   });
 
   revalidatePath("/cotizador");
@@ -28,16 +73,12 @@ export async function crearCotizacionSimple(formData: FormData) {
   if (error) redirect(`/cotizador?error=${encodeURIComponent(error.message)}`);
 
   const resultado = data?.[0] as
-    | { numero: number | null; total: number | string | null; status: string }
+    | { id_cotizacion: string | null; numero: number | null; total: number | string | null; status: string }
     | undefined;
 
-  if (!resultado || resultado.status !== "OK") {
+  if (!resultado || resultado.status !== "OK" || !resultado.id_cotizacion) {
     redirect(`/cotizador?status=${encodeURIComponent(resultado?.status ?? "ERROR")}`);
   }
 
-  redirect(
-    `/cotizador?ok=cotizacion&numero=${resultado.numero}&total=${encodeURIComponent(
-      String(resultado.total),
-    )}`,
-  );
+  redirect(`/cotizador/${resultado.id_cotizacion}`);
 }

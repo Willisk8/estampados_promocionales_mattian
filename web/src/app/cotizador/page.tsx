@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
 import { SinAcceso } from "@/componentes/sin-acceso";
-import { crearCotizacionSimple } from "./acciones";
+import { crearCotizacionCalculada, prepararCotizacionCalculada } from "./acciones";
 
 export const dynamic = "force-dynamic";
 
@@ -32,13 +32,31 @@ type Organizacion = {
   nit: string | null;
 };
 
-const cop = (v: string | number) =>
-  "$" + Number(v).toLocaleString("es-CO", { maximumFractionDigits: 0 });
+type TecnicaDisponible = {
+  id_tecnica: string;
+  codigo: string;
+};
+
+const cop = (v: string | number | null | undefined) =>
+  v === null || v === undefined
+    ? "—"
+    : "$" + Number(v).toLocaleString("es-CO", { maximumFractionDigits: 0 });
 
 export default async function PaginaCotizador({
   searchParams,
 }: {
-  searchParams: Promise<{ ok?: string; numero?: string; total?: string; status?: string; error?: string }>;
+  searchParams: Promise<{
+    id_producto?: string;
+    id_variante?: string;
+    id_organizacion?: string;
+    cantidad?: string;
+    numero_preparaciones?: string;
+    transporte_total?: string;
+    margen_override_pct?: string;
+    notas?: string;
+    status?: string;
+    error?: string;
+  }>;
 }) {
   const sesion = await obtenerSesionConsola();
   if (!sesion) return <SinAcceso />;
@@ -59,7 +77,7 @@ export default async function PaginaCotizador({
       .limit(100),
     supabase
       .from("cotizacion")
-      .select("id_cotizacion, numero, total, estado, created_at")
+      .select("id_cotizacion, numero, total, estado, created_at, metodo_precio")
       .order("created_at", { ascending: false })
       .limit(8),
   ]);
@@ -72,23 +90,32 @@ export default async function PaginaCotizador({
     total: number | string;
     estado: string;
     created_at: string;
+    metodo_precio: string | null;
   }>;
   const puedeCotizar = sesion.rol === "ADMIN" || sesion.rol === "COMERCIAL";
   const idempotencyKey = randomUUID();
+  const cantidadSeleccionada = Number(sp.cantidad ?? 0);
+  const productoSeleccionado = productos.find((p) => p.id_producto === sp.id_producto);
+  let tecnicas: TecnicaDisponible[] = [];
+
+  if (sp.id_producto && Number.isFinite(cantidadSeleccionada) && cantidadSeleccionada > 0) {
+    const { data: tecnicasResp } = await supabase.rpc("fn_consola_tecnicas_disponibles_producto", {
+      p_id_producto: sp.id_producto,
+      p_id_variante: sp.id_variante || null,
+      p_cantidad: cantidadSeleccionada,
+    });
+    tecnicas = (tecnicasResp ?? []) as TecnicaDisponible[];
+  }
 
   return (
     <>
       <h1>Cotizador</h1>
       <p className="subtitulo">
-        Presente desde el primer dia para que la separacion entre cotizar y
-        simular quede clara.
+        Cotización calculada desde costos versionados: producto, técnica,
+        preparaciones y transporte. La tarifa publicada queda como referencia,
+        no como único camino de emisión.
       </p>
 
-      {sp.ok === "cotizacion" && (
-        <div className="aviso-caja neutro">
-          Cotizacion #{sp.numero} emitida por {cop(sp.total ?? 0)}.
-        </div>
-      )}
       {sp.status && (
         <div className="aviso-caja">
           No se pudo cotizar: <code>{sp.status}</code>.
@@ -96,17 +123,16 @@ export default async function PaginaCotizador({
       )}
       {sp.error && <div className="aviso-caja">{sp.error}</div>}
 
-      <h2>Cotizacion comercial</h2>
+      <h2>1. Datos base</h2>
       <div className="tarjeta">
         <p style={{ marginTop: 0 }}>
-          Consulta precios ya aprobados mediante <code>resolve_price()</code>. No
-          recalcula nada: la RPC de servidor guarda una cotizacion emitida con
-          snapshot del producto, precio y cantidad.
+          Primero define producto y cantidad. Con eso la consola consulta
+          <code> fn_consola_tecnicas_disponibles_producto()</code> filtrando
+          mínimos/máximos de cantidad para no ofrecer técnicas que luego fallen.
         </p>
-        <form action={crearCotizacionSimple} className="filtros">
-          <input type="hidden" name="idempotency_key" value={idempotencyKey} />
-          <select name="id_organizacion" defaultValue="" disabled={!puedeCotizar}>
-            <option value="">Sin organizacion asociada</option>
+        <form action={prepararCotizacionCalculada} className="filtros">
+          <select name="id_organizacion" defaultValue={sp.id_organizacion ?? ""} disabled={!puedeCotizar}>
+            <option value="">Sin organización asociada</option>
             {organizaciones.map((o) => (
               <option key={o.id_organizacion} value={o.id_organizacion}>
                 {o.nombre_legal}
@@ -114,55 +140,118 @@ export default async function PaginaCotizador({
               </option>
             ))}
           </select>
-          <select name="producto_variante" required disabled={!puedeCotizar}>
-            <option value="">Producto aprobado</option>
-            {productos.flatMap((p) => {
-              const variantes = (p.variante_producto ?? []).filter(
-                (v) => v.estado === "ACTIVE",
-              );
-              if (variantes.length === 0) {
-                return [
-                  <option key={p.id_producto} value={`${p.id_producto}|`}>
-                    {p.sku} - {p.nombre}
-                  </option>,
-                ];
-              }
-              return variantes.map((v) => (
-                <option
-                  key={v.id_variante}
-                  value={`${p.id_producto}|${v.id_variante}`}
-                >
-                  {p.sku} / {v.sku_variante} - {p.nombre} ({v.nombre})
+          <select name="id_producto" required defaultValue={sp.id_producto ?? ""} disabled={!puedeCotizar}>
+            <option value="">Producto activo</option>
+            {productos.map((p) => (
+              <option key={p.id_producto} value={p.id_producto}>
+                {p.sku} - {p.nombre}
+              </option>
+            ))}
+          </select>
+          <select name="id_variante" defaultValue={sp.id_variante ?? ""} disabled={!puedeCotizar || !productoSeleccionado}>
+            <option value="">Sin variante</option>
+            {(productoSeleccionado?.variante_producto ?? [])
+              .filter((v) => v.estado === "ACTIVE")
+              .map((v) => (
+                <option key={v.id_variante} value={v.id_variante}>
+                  {v.sku_variante} - {v.nombre}
                 </option>
-              ));
-            })}
+              ))}
           </select>
           <input
             name="cantidad"
             type="number"
             min="1"
             placeholder="Cantidad"
+            defaultValue={sp.cantidad ?? ""}
             required
             disabled={!puedeCotizar}
           />
-          <input name="notas" placeholder="Notas" disabled={!puedeCotizar} />
+          <input
+            name="numero_preparaciones"
+            type="number"
+            min="0"
+            placeholder="Preparaciones"
+            defaultValue={sp.numero_preparaciones ?? "1"}
+            disabled={!puedeCotizar}
+          />
+          <input
+            name="transporte_total"
+            type="number"
+            min="0"
+            placeholder="Transporte total"
+            defaultValue={sp.transporte_total ?? "0"}
+            disabled={!puedeCotizar}
+          />
+          {sesion.rol === "ADMIN" && (
+            <input
+              name="margen_override_pct"
+              type="number"
+              step="0.01"
+              placeholder="Margen % opcional"
+              defaultValue={sp.margen_override_pct ?? ""}
+              disabled={!puedeCotizar}
+            />
+          )}
+          <input name="notas" placeholder="Notas" defaultValue={sp.notas ?? ""} disabled={!puedeCotizar} />
           <button type="submit" disabled={!puedeCotizar || productos.length === 0}>
-            Emitir
+            Actualizar técnicas
           </button>
         </form>
-        <p style={{ fontSize: 13, color: "var(--texto-suave)", marginBottom: 0 }}>
-          <code>resolve_price()</code> sigue sin permiso directo para el navegador;
-          solo la funcion controlada de cotizacion puede usarlo.
-        </p>
       </div>
 
-      <h2>Ultimas cotizaciones</h2>
+      <h2>2. Emitir cotización calculada</h2>
+      <div className="tarjeta">
+        {!sp.id_producto || !sp.cantidad ? (
+          <p style={{ marginTop: 0, color: "var(--texto-suave)" }}>
+            Selecciona producto y cantidad para habilitar la emisión calculada.
+          </p>
+        ) : (
+          <>
+            <p style={{ marginTop: 0 }}>
+              Producto: <strong>{productoSeleccionado?.sku ?? "seleccionado"}</strong>.{" "}
+              Puedes cotizar sin técnica o elegir una técnica disponible para esta cantidad.
+            </p>
+            <form action={crearCotizacionCalculada} className="filtros">
+              <input type="hidden" name="idempotency_key" value={idempotencyKey} />
+              <input type="hidden" name="id_producto" value={sp.id_producto} />
+              <input type="hidden" name="id_variante" value={sp.id_variante ?? ""} />
+              <input type="hidden" name="id_organizacion" value={sp.id_organizacion ?? ""} />
+              <input type="hidden" name="cantidad" value={sp.cantidad} />
+              <input type="hidden" name="numero_preparaciones" value={sp.numero_preparaciones ?? "1"} />
+              <input type="hidden" name="transporte_total" value={sp.transporte_total ?? "0"} />
+              <input type="hidden" name="margen_override_pct" value={sp.margen_override_pct ?? ""} />
+              <input type="hidden" name="notas" value={sp.notas ?? ""} />
+              <select name="id_tecnica" defaultValue="" disabled={!puedeCotizar}>
+                <option value="">Sin técnica explícita</option>
+                {tecnicas.map((t) => (
+                  <option key={t.id_tecnica} value={t.id_tecnica}>
+                    {t.codigo}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" disabled={!puedeCotizar}>
+                Emitir con cálculo
+              </button>
+            </form>
+            {tecnicas.length === 0 && (
+              <p style={{ fontSize: 13, color: "var(--texto-suave)", marginBottom: 0 }}>
+                No hay técnicas curadas para este producto/cantidad; aún puedes emitir
+                sin técnica usando costos base del producto.
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
+      <h2>Últimas cotizaciones</h2>
       <div className="tabla-contenedor">
         <table>
           <thead>
             <tr>
-              <th>Numero</th>
+              <th>Número</th>
               <th>Estado</th>
+              <th>Método</th>
               <th className="num">Total</th>
               <th>Creada</th>
             </tr>
@@ -170,17 +259,20 @@ export default async function PaginaCotizador({
           <tbody>
             {cotizaciones.map((c) => (
               <tr key={c.id_cotizacion}>
-                <td>#{c.numero}</td>
+                <td>
+                  <a href={`/cotizador/${c.id_cotizacion}`}>#{c.numero}</a>
+                </td>
                 <td>
                   <span className="insignia">{c.estado}</span>
                 </td>
+                <td>{c.metodo_precio ?? "—"}</td>
                 <td className="num">{cop(c.total)}</td>
                 <td>{new Date(c.created_at).toLocaleString("es-CO")}</td>
               </tr>
             ))}
             {cotizaciones.length === 0 && (
               <tr>
-                <td colSpan={4} style={{ color: "var(--texto-suave)" }}>
+                <td colSpan={5} style={{ color: "var(--texto-suave)" }}>
                   Sin cotizaciones emitidas.
                 </td>
               </tr>
@@ -189,37 +281,14 @@ export default async function PaginaCotizador({
         </table>
       </div>
 
-      <h2>Simulador administrativo</h2>
-      <div className="tarjeta">
-        <p style={{ marginTop: 0 }}>
-          Calcula desde insumos: costo de proveedor, marcacion, empaque, mano de
-          obra, gastos, retenciones y margen. Sirve para construir escalas nuevas,
-          no para cotizarle a un cliente.
-        </p>
-        <div className="filtros">
-          <input placeholder="Costo proveedor" disabled />
-          <input placeholder="Tecnica" disabled />
-          <input placeholder="Margen %" disabled />
-          <button type="button" disabled>
-            Simular
-          </button>
-        </div>
-        <p style={{ fontSize: 13, color: "var(--texto-suave)", marginBottom: 0 }}>
-          La logica vive hoy en <code>scripts/catalog/pricing_model.py</code> y se
-          ejecuta desde consola, con entradas versionadas en JSON.
-        </p>
-      </div>
-
       <div className="aviso-caja neutro">
-        Catalogo actual: {r?.productos_propios_activos ?? "?"} productos activos,{" "}
-        {r?.precios_comerciales_vigentes ?? "?"} precios vigentes
+        Catálogo actual: {r?.productos_propios_activos ?? "?"} productos activos,{" "}
+        {r?.precios_comerciales_vigentes ?? "?"} precios publicados vigentes
         {r?.productos_propios_borrador
           ? ` y ${r.productos_propios_borrador} borradores por costos sin confirmar`
           : ""}
-        .{" "}
-        Estas dos funciones estan separadas a proposito. Un precio aprobado no
-        debe recalcularse libremente durante una cotizacion: si el calculo cambia,
-        cambia la escala, y eso pasa por revision.
+        . El flujo nuevo usa <code>fn_consola_crear_cotizacion_calculada()</code> y
+        persiste componentes/snapshots para auditoría.
       </div>
     </>
   );

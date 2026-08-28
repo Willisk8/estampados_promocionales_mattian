@@ -21,11 +21,15 @@ INSERT INTO producto_tecnica (id_producto_tecnica, id_producto, id_variante, id_
 INSERT INTO proveedor_tecnica_marcacion (id_proveedor_tecnica, source_id, nombre)
 VALUES ('00000000-0000-4000-fe00-000000000030', 'fixture_tecdisp_provider', 'Proveedor test tecdisp');
 
-INSERT INTO precio_tecnica_marcacion_snapshot (id_snapshot, id_tecnica, id_proveedor_tecnica, observation_id, service_component, price_scope, billing_unit, currency, price_value, fetched_at, verification_status)
+INSERT INTO precio_tecnica_marcacion_snapshot (
+    id_snapshot, id_tecnica, id_proveedor_tecnica, observation_id,
+    service_component, price_scope, billing_unit, currency, price_value,
+    quantity_min, quantity_max, fetched_at, verification_status
+)
 VALUES
-    ('00000000-0000-4000-fe00-000000000040', '00000000-0000-4000-fe00-000000000010', '00000000-0000-4000-fe00-000000000030', 'fixture-tecdisp-2026', 'marcacion', 'solo_marcacion', 'unidad', 'COP', 1000, now(), 'VERIFIED_PUBLIC_PRICE'),
-    ('00000000-0000-4000-fe00-000000000041', '00000000-0000-4000-fe00-000000000012', '00000000-0000-4000-fe00-000000000030', 'fixture-tecdisp-2026-permitida-false', 'marcacion', 'solo_marcacion', 'unidad', 'COP', 1000, now(), 'VERIFIED_PUBLIC_PRICE'),
-    ('00000000-0000-4000-fe00-000000000042', '00000000-0000-4000-fe00-000000000013', '00000000-0000-4000-fe00-000000000030', 'fixture-tecdisp-2026-null-price', 'marcacion', 'solo_marcacion', 'unidad', 'COP', NULL, now(), 'VERIFIED_PUBLIC_PRICE');
+    ('00000000-0000-4000-fe00-000000000040', '00000000-0000-4000-fe00-000000000010', '00000000-0000-4000-fe00-000000000030', 'fixture-tecdisp-2026', 'marcacion', 'solo_marcacion', 'unidad', 'COP', 1000, 50, 999, now(), 'VERIFIED_PUBLIC_PRICE'),
+    ('00000000-0000-4000-fe00-000000000041', '00000000-0000-4000-fe00-000000000012', '00000000-0000-4000-fe00-000000000030', 'fixture-tecdisp-2026-permitida-false', 'marcacion', 'solo_marcacion', 'unidad', 'COP', 1000, NULL, NULL, now(), 'VERIFIED_PUBLIC_PRICE'),
+    ('00000000-0000-4000-fe00-000000000042', '00000000-0000-4000-fe00-000000000013', '00000000-0000-4000-fe00-000000000030', 'fixture-tecdisp-2026-null-price', 'marcacion', 'solo_marcacion', 'unidad', 'COP', NULL, NULL, NULL, now(), 'VERIFIED_PUBLIC_PRICE');
 
 INSERT INTO curacion_precio_tecnica_marcacion (id_snapshot, usage_status, formula_code, usage_notes)
 VALUES
@@ -42,6 +46,14 @@ BEGIN
     SELECT COUNT(*) INTO v_count FROM fn_consola_tecnicas_disponibles_producto('00000000-0000-4000-fe00-000000000003')
      WHERE id_tecnica = '00000000-0000-4000-fe00-000000000010';
     ASSERT v_count = 1, 'la tecnica con snapshot curado DEBE aparecer';
+
+    SELECT COUNT(*) INTO v_count FROM fn_consola_tecnicas_disponibles_producto('00000000-0000-4000-fe00-000000000003', NULL, 10)
+     WHERE id_tecnica = '00000000-0000-4000-fe00-000000000010';
+    ASSERT v_count = 0, 'con p_cantidad=10 no debe aparecer una tecnica cuyo snapshot empieza en 50';
+
+    SELECT COUNT(*) INTO v_count FROM fn_consola_tecnicas_disponibles_producto('00000000-0000-4000-fe00-000000000003', NULL, 50)
+     WHERE id_tecnica = '00000000-0000-4000-fe00-000000000010';
+    ASSERT v_count = 1, 'con p_cantidad=50 si debe aparecer la tecnica cuyo snapshot empieza en 50';
 
     SELECT COUNT(*) INTO v_count FROM fn_consola_tecnicas_disponibles_producto('00000000-0000-4000-fe00-000000000003')
      WHERE id_tecnica = '00000000-0000-4000-fe00-000000000011';

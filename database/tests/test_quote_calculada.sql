@@ -213,11 +213,70 @@ $$;
 RESET ROLE;
 
 -- Idempotencia: mismo payload misma cotizacion, payload distinto CONFLICT
+-- Fixture con tecnica cotizable para probar que preparaciones tambien hacen
+-- parte del payload de idempotencia calculada.
+INSERT INTO tecnica_marcacion (id_tecnica, codigo)
+VALUES ('00000000-0000-4000-fd00-00000000000a', 'calc_snapshot_test');
+
+INSERT INTO proveedor_tecnica_marcacion (id_proveedor_tecnica, source_id, nombre)
+VALUES ('00000000-0000-4000-fd00-00000000000b', 'fixture_calc_provider', 'Proveedor calc fixture');
+
+INSERT INTO producto_tecnica (
+    id_producto_tecnica, id_producto, id_variante, id_tecnica,
+    cantidad_minima_tecnica, cantidad_recomendada, configuracion_estandar,
+    merma_pct, permitida, costo_preparacion
+) VALUES (
+    '00000000-0000-4000-fd00-00000000000c',
+    '00000000-0000-4000-fd00-000000000003',
+    NULL,
+    '00000000-0000-4000-fd00-00000000000a',
+    1,
+    1,
+    '{}'::jsonb,
+    0,
+    true,
+    50
+);
+
+INSERT INTO precio_tecnica_marcacion_snapshot (
+    id_snapshot, id_tecnica, id_proveedor_tecnica, observation_id,
+    service_component, price_scope, billing_unit, currency, price_value,
+    quantity_min, quantity_max, fetched_at, verification_status
+) VALUES (
+    '00000000-0000-4000-fd00-00000000000d',
+    '00000000-0000-4000-fd00-00000000000a',
+    '00000000-0000-4000-fd00-00000000000b',
+    'fixture-calc-tecnica-unit-2026',
+    'marcacion',
+    'solo_marcacion',
+    'unidad',
+    'COP',
+    100,
+    1,
+    999,
+    now(),
+    'VERIFIED_PUBLIC_PRICE'
+);
+
+INSERT INTO curacion_precio_tecnica_marcacion (id_snapshot, usage_status, formula_code, usage_notes)
+VALUES ('00000000-0000-4000-fd00-00000000000d', 'AUTOMATIC_PRICING', 'unit_fixture', 'fixture calculada');
+
 SELECT set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-fd00-000000000001"}', true);
 SET LOCAL ROLE authenticated;
 
 DO $$
-DECLARE r1 RECORD; r2 RECORD; r3 RECORD;
+DECLARE
+    r1 RECORD;
+    r2 RECORD;
+    r3 RECORD;
+    r_transporte_1 RECORD;
+    r_transporte_2 RECORD;
+    r_margen_1 RECORD;
+    r_margen_2 RECORD;
+    r_policy_1 RECORD;
+    r_policy_2 RECORD;
+    r_prep_1 RECORD;
+    r_prep_2 RECORD;
 BEGIN
     SELECT * INTO r1 FROM fn_consola_crear_cotizacion_calculada(
         p_id_producto => '00000000-0000-4000-fd00-000000000003', p_cantidad => 20,
@@ -234,7 +293,70 @@ BEGIN
         p_idempotency_key => 'fixture-key-calc-idem'
     );
     ASSERT r3.status = 'CONFLICT', format('payload distinto misma clave debe dar CONFLICT, obtuve %s', r3.status);
-    RAISE NOTICE 'PASSED - idempotencia igual que 059';
+
+    SELECT * INTO r_transporte_1 FROM fn_consola_crear_cotizacion_calculada(
+        p_id_producto => '00000000-0000-4000-fd00-000000000003',
+        p_cantidad => 20,
+        p_transporte_total => 0,
+        p_idempotency_key => 'fixture-key-calc-transporte'
+    );
+    SELECT * INTO r_transporte_2 FROM fn_consola_crear_cotizacion_calculada(
+        p_id_producto => '00000000-0000-4000-fd00-000000000003',
+        p_cantidad => 20,
+        p_transporte_total => 99999,
+        p_idempotency_key => 'fixture-key-calc-transporte'
+    );
+    ASSERT r_transporte_1.status = 'OK' AND r_transporte_2.status = 'CONFLICT',
+        'reusar key con transporte distinto debe marcar CONFLICT';
+
+    SELECT * INTO r_margen_1 FROM fn_consola_crear_cotizacion_calculada(
+        p_id_producto => '00000000-0000-4000-fd00-000000000003',
+        p_cantidad => 20,
+        p_margen_override_pct => NULL,
+        p_idempotency_key => 'fixture-key-calc-margen'
+    );
+    SELECT * INTO r_margen_2 FROM fn_consola_crear_cotizacion_calculada(
+        p_id_producto => '00000000-0000-4000-fd00-000000000003',
+        p_cantidad => 20,
+        p_margen_override_pct => 40,
+        p_idempotency_key => 'fixture-key-calc-margen'
+    );
+    ASSERT r_margen_1.status = 'OK' AND r_margen_2.status = 'CONFLICT',
+        'reusar key con margen override distinto debe marcar CONFLICT';
+
+    SELECT * INTO r_policy_1 FROM fn_consola_crear_cotizacion_calculada(
+        p_id_producto => '00000000-0000-4000-fd00-000000000003',
+        p_cantidad => 20,
+        p_policy_code => 'MVP_DEFAULT',
+        p_idempotency_key => 'fixture-key-calc-policy'
+    );
+    SELECT * INTO r_policy_2 FROM fn_consola_crear_cotizacion_calculada(
+        p_id_producto => '00000000-0000-4000-fd00-000000000003',
+        p_cantidad => 20,
+        p_policy_code => 'TEST_CALC_POLICY',
+        p_idempotency_key => 'fixture-key-calc-policy'
+    );
+    ASSERT r_policy_1.status = 'OK' AND r_policy_2.status = 'CONFLICT',
+        'reusar key con politica distinta debe marcar CONFLICT';
+
+    SELECT * INTO r_prep_1 FROM fn_consola_crear_cotizacion_calculada(
+        p_id_producto => '00000000-0000-4000-fd00-000000000003',
+        p_cantidad => 20,
+        p_id_tecnica => '00000000-0000-4000-fd00-00000000000a',
+        p_numero_preparaciones => 1,
+        p_idempotency_key => 'fixture-key-calc-preparaciones'
+    );
+    SELECT * INTO r_prep_2 FROM fn_consola_crear_cotizacion_calculada(
+        p_id_producto => '00000000-0000-4000-fd00-000000000003',
+        p_cantidad => 20,
+        p_id_tecnica => '00000000-0000-4000-fd00-00000000000a',
+        p_numero_preparaciones => 5,
+        p_idempotency_key => 'fixture-key-calc-preparaciones'
+    );
+    ASSERT r_prep_1.status = 'OK' AND r_prep_2.status = 'CONFLICT',
+        'reusar key con numero_preparaciones distinto debe marcar CONFLICT';
+
+    RAISE NOTICE 'PASSED - idempotencia calculada detecta payload distinto completo';
 END;
 $$;
 
