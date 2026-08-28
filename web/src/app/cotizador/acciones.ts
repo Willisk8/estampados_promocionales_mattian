@@ -41,6 +41,34 @@ export async function prepararCotizacionCalculada(formData: FormData) {
   redirect(`/cotizador?${params.toString()}`);
 }
 
+export async function prepararPrevisualizacion(formData: FormData) {
+  const params = new URLSearchParams();
+  const idProducto = leerTexto(formData, "id_producto");
+  const idVariante = leerTexto(formData, "id_variante");
+  const cantidad = leerNumero(formData, "cantidad");
+  const idOrganizacion = leerTexto(formData, "id_organizacion");
+  const idTecnica = leerTexto(formData, "id_tecnica");
+  const numeroPreparaciones = leerNumero(formData, "numero_preparaciones");
+  const transporteTotal = leerNumero(formData, "transporte_total");
+  const margenOverride = leerNumero(formData, "margen_override_pct");
+  const notas = leerTexto(formData, "notas");
+
+  if (idProducto) params.set("id_producto", idProducto);
+  if (idVariante) params.set("id_variante", idVariante);
+  if (cantidad) params.set("cantidad", String(cantidad));
+  if (idOrganizacion) params.set("id_organizacion", idOrganizacion);
+  if (idTecnica) params.set("id_tecnica", idTecnica);
+  if (numeroPreparaciones !== null) {
+    params.set("numero_preparaciones", String(numeroPreparaciones));
+  }
+  if (transporteTotal !== null) params.set("transporte_total", String(transporteTotal));
+  if (margenOverride !== null) params.set("margen_override_pct", String(margenOverride));
+  if (notas) params.set("notas", notas);
+  params.set("previsualizar", "1");
+
+  redirect(`/cotizador?${params.toString()}`);
+}
+
 export async function crearCotizacionCalculada(formData: FormData) {
   const idProducto = leerTexto(formData, "id_producto");
   const idVariante = leerTexto(formData, "id_variante");
