@@ -16,6 +16,7 @@
     "verificar": "node -e \"process.env.NEXT_DIST_DIR='.next-verificacion';require('child_process').execSync('npx next build',{stdio:'inherit',env:process.env})\""
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.9.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.58.0",
     "next": "^15.5.0",

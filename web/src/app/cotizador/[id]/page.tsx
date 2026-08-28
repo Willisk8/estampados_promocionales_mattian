@@ -131,6 +131,9 @@ export default async function DetalleCotizacion({
           <button type="button" disabled title="Pendiente: generación/envío de PDF">
             Enviar PDF por correo
           </button>
+          <a href={`/cotizador/${id}/pdf`}>
+            <button type="button">Generar PDF</button>
+          </a>
         </div>
       </div>
     </>
