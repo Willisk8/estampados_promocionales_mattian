@@ -89,3 +89,7 @@ pruebas-cline.txt
 .supabase/
 supabase/.branches/
 supabase/seed.sql
+
+# Dist dirs de builds de verificacion QA (scratch)
+.next-qa/
+.next-verificacion/

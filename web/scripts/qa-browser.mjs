@@ -109,14 +109,30 @@ try {
   await nav(PREVIEW);
   await waitFor("document.body.innerText.includes('Total calculado')", "preview-total", 90);
   results.total = await evaljs("document.body.innerText.match(/Total calculado:[^\\n]*/)?.[0]");
-  results.comercialVeInputMargenOverride = await evaljs("!!document.querySelector('input[name=margen_override_pct]')");
+  results.comercialVeInputMargenOverride = await evaljs(
+    "!!document.querySelector('input[name=margen_override_pct]:not([type=hidden])')",
+  );
   results.idemKey = await evaljs("document.querySelector('input[name=idempotency_key]')?.value ?? null");
+  if (process.env.QA_PROBE_ONLY === "1") {
+    console.log("RESULTS " + JSON.stringify(results, null, 1));
+    console.log("PROBE_DONE");
+    try { ws.close(); } catch {}
+    try { edge.kill(); } catch {}
+    process.exit(0);
+  }
 
-  // 3) EMITIR
+  // 3) EMITIR con doble click adversarial (misma idempotency_key)
   results.emitButtons = await evaljs(`(() => {
     const btns = [...document.querySelectorAll('button')].filter((b) => /Emitir cotizacion/i.test(b.textContent) && !b.disabled);
     if (btns.length) btns[0].click();
     return btns.length;
+  })()`);
+  results.secondClick = await evaljs(`(() => {
+    const btns = [...document.querySelectorAll('button')].filter((b) => /Emitir cotizacion/i.test(b.textContent));
+    if (!btns.length) return 'NO_BUTTON';
+    if (btns[0].disabled) return 'DISABLED_BY_REACT';
+    btns[0].click();
+    return 'CLICKED_AGAIN';
   })()`);
   let emitted = false;
   for (let i = 0; i < 75 && !emitted; i++) {
@@ -145,6 +161,45 @@ try {
       const b = await r.arrayBuffer();
       return { status: r.status, size: b.byteLength };
     })()`);
+
+    // 6) Negativa: COMERCIAL intenta margen_override_pct=25 (regla 073 -> debe rechazar)
+    await nav(PREVIEW + "&margen_override_pct=25");
+    await waitFor(
+      "document.body.innerText.includes('Total calculado') || document.body.innerText.toLowerCase().includes('no se pudo')",
+      "preview-override",
+      90,
+    );
+    results.overridePreviewTotal = await evaljs(
+      "document.body.innerText.match(/Total calculado:[^\\n]*/)?.[0] ?? null",
+    );
+    await evaljs(`(() => {
+      const btns = [...document.querySelectorAll('button')].filter((b) => /Emitir cotizacion/i.test(b.textContent) && !b.disabled);
+      if (btns.length) btns[0].click();
+      return btns.length;
+    })()`);
+    results.overrideBypassed = false;
+    results.overrideRejected = false;
+    for (let i = 0; i < 30; i++) {
+      await sleep(1000);
+      const path = await evaljs("location.pathname").catch(() => "");
+      if (/^[/]cotizador[/][0-9a-f-]{36}$/.test(path)) {
+        results.overrideBypassed = true;
+        break;
+      }
+      const body = await evaljs(
+        "document.body.innerText.replace(/\\s+/g,' ').slice(0, 400)",
+      ).catch(() => "");
+      if (/No se pudo cotizar|No se pudo calcular/i.test(body)) {
+        results.overrideRejected = true;
+        results.overrideBodySnippet = body;
+        break;
+      }
+    }
+    if (!results.overrideBypassed && !results.overrideRejected) {
+      results.overrideBodySnippet = await evaljs(
+        "document.body.innerText.replace(/\\s+/g,' ').slice(0, 400)",
+      ).catch(() => null);
+    }
   } else {
     results.emitError = await evaljs("document.body.innerText.replace(/\\s+/g,' ').slice(0, 500)").catch(() => null);
   }

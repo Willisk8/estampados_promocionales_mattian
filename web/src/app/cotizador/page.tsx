@@ -178,55 +178,68 @@ export default async function PaginaCotizador({
     canal_origen: string | null;
   }>;
 
-  let productosProveedor: ProductoProveedor[] = [];
-  if (sp.id_proveedor) {
-    const { data } = await supabase.rpc("fn_consola_buscar_productos_proveedor", {
-      p_id_proveedor: sp.id_proveedor,
-      p_q: sp.q_producto ?? null,
-      p_limit: 120,
-    });
-    productosProveedor = (data ?? []) as ProductoProveedor[];
-  }
+  // Consultas derivadas: dependen solo de searchParams, por lo que se resuelven
+  // en paralelo (evita 4 round-trips seriales hacia Supabase en cada render).
+  const productosPromise = sp.id_proveedor
+    ? supabase
+        .rpc("fn_consola_buscar_productos_proveedor", {
+          p_id_proveedor: sp.id_proveedor,
+          p_q: sp.q_producto ?? null,
+          p_limit: 120,
+        })
+        .then((r) => (r.data ?? []) as ProductoProveedor[])
+    : Promise.resolve([] as ProductoProveedor[]);
 
-  let ofertas: OfertaProveedor[] = [];
-  if (sp.id_producto_proveedor) {
-    const { data } = await supabase.rpc("fn_consola_ofertas_producto_proveedor", {
-      p_id_producto_proveedor: sp.id_producto_proveedor,
-      p_cantidad: Number.isFinite(cantidad) && cantidad > 0 ? cantidad : 1,
-    });
-    ofertas = (data ?? []) as OfertaProveedor[];
-  }
+  const ofertasPromise = sp.id_producto_proveedor
+    ? supabase
+        .rpc("fn_consola_ofertas_producto_proveedor", {
+          p_id_producto_proveedor: sp.id_producto_proveedor,
+          p_cantidad: Number.isFinite(cantidad) && cantidad > 0 ? cantidad : 1,
+        })
+        .then((r) => (r.data ?? []) as OfertaProveedor[])
+    : Promise.resolve([] as OfertaProveedor[]);
 
-  let tecnicas: TecnicaSnapshot[] = [];
-  if (Number.isFinite(cantidad) && cantidad > 0) {
-    const { data } = await supabase.rpc("fn_consola_buscar_snapshots_tecnica_marcacion", {
-      p_q: sp.q_tecnica ?? null,
-      p_cantidad: cantidad,
-      p_moneda: "COP",
-      p_limit: 80,
-    });
-    tecnicas = (data ?? []) as TecnicaSnapshot[];
-  }
+  const tecnicasPromise =
+    Number.isFinite(cantidad) && cantidad > 0
+      ? supabase
+          .rpc("fn_consola_buscar_snapshots_tecnica_marcacion", {
+            p_q: sp.q_tecnica ?? null,
+            p_cantidad: cantidad,
+            p_moneda: "COP",
+            p_limit: 80,
+          })
+          .then((r) => (r.data ?? []) as TecnicaSnapshot[])
+      : Promise.resolve([] as TecnicaSnapshot[]);
 
   const mostrarPreview =
     sp.previsualizar_proveedor === "1" &&
     !!sp.id_precio_proveedor_snapshot &&
     Number.isFinite(cantidad) &&
     cantidad > 0;
+  const snapshotPreview = mostrarPreview ? sp.id_precio_proveedor_snapshot : null;
 
-  let previewFilas: ComponentePreview[] = [];
-  if (mostrarPreview) {
-    const { data } = await supabase.rpc("fn_consola_previsualizar_cotizacion_proveedor", {
-      p_id_precio_proveedor_snapshot: sp.id_precio_proveedor_snapshot,
-      p_cantidad: cantidad,
-      p_marking_lines: buildMarkingLines(sp),
-      p_transporte_total: Number(sp.transporte_total ?? 0),
-      p_transport_mode: sp.transport_mode ?? "SEPARATE_LINE",
-      p_policy_code: "MVP_DEFAULT",
-      p_margen_override_pct: sp.margen_override_pct ? Number(sp.margen_override_pct) : null,
-    });
-    previewFilas = (data ?? []) as ComponentePreview[];
-  }
+  const previewPromise = snapshotPreview
+    ? supabase
+        .rpc("fn_consola_previsualizar_cotizacion_proveedor", {
+          p_id_precio_proveedor_snapshot: snapshotPreview,
+          p_cantidad: cantidad,
+          p_marking_lines: buildMarkingLines(sp),
+          p_transporte_total: Number(sp.transporte_total ?? 0),
+          p_transport_mode: sp.transport_mode ?? "SEPARATE_LINE",
+          p_policy_code: "MVP_DEFAULT",
+          p_margen_override_pct: sp.margen_override_pct
+            ? Number(sp.margen_override_pct)
+            : null,
+        })
+        .then((r) => (r.data ?? []) as ComponentePreview[])
+    : Promise.resolve([] as ComponentePreview[]);
+
+  const [productosProveedor, ofertas, tecnicas, previewFilas] = await Promise.all([
+    productosPromise,
+    ofertasPromise,
+    tecnicasPromise,
+    previewPromise,
+  ]);
 
   const previewOk = previewFilas.length > 0 && previewFilas.every((f) => f.status === "OK");
   const previewTotal = previewOk
