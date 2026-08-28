@@ -73,6 +73,18 @@ scratch/
 *.swp
 *.swo
 
+# Outputs y logs de sesiones QA/Cline (artefactos temporales, no versionar)
+qa-*.out
+qa-*.sql
+qa-emit-*.txt
+qa-pdf-*.bin
+cot-*.html
+stg-*.txt
+dev-cline*.log
+dev-cline*.err.log
+dev-cline.pid
+pruebas-cline.txt
+
 # Supabase CLI (si se usa en el futuro)
 .supabase/
 supabase/.branches/
