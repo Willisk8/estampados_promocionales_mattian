@@ -83,6 +83,20 @@ BEGIN
 END;
 $$;
 
+DO $$
+DECLARE det RECORD;
+BEGIN
+    SELECT * INTO det FROM fn_consola_previsualizar_cotizacion_calculada(
+        p_id_producto => '00000000-0000-4000-fe00-000000000003',
+        p_cantidad => 10,
+        p_margen_override_pct => 40
+    );
+    ASSERT det.status = 'MARGIN_OVERRIDE_FORBIDDEN',
+        format('COMERCIAL no debe inyectar margen manual en preview, obtuvo %s', det.status);
+    RAISE NOTICE 'PASSED - COMERCIAL no puede inyectar margen manual en preview';
+END;
+$$;
+
 RESET ROLE;
 
 -- LECTURA: FORBIDDEN, no excepcion

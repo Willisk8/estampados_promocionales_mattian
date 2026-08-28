@@ -71,6 +71,22 @@ BEGIN
 END;
 $$;
 
+DO $$
+DECLARE r RECORD;
+BEGIN
+    SELECT * INTO r FROM fn_consola_crear_cotizacion_calculada(
+        p_id_organizacion => '00000000-0000-4000-fd00-000000000010',
+        p_id_producto => '00000000-0000-4000-fd00-000000000003',
+        p_cantidad => 5,
+        p_margen_override_pct => 40
+    );
+    ASSERT r.status = 'MARGIN_OVERRIDE_FORBIDDEN',
+        format('COMERCIAL no debe inyectar margen manual en emision, obtuvo %s', r.status);
+    ASSERT r.id_cotizacion IS NULL, 'override prohibido no debe crear cotizacion';
+    RAISE NOTICE 'PASSED - COMERCIAL no puede inyectar margen manual en emision';
+END;
+$$;
+
 RESET ROLE;
 
 -- LECTURA no puede crear
@@ -205,8 +221,8 @@ BEGIN
         p_policy_code => 'TEST_CALC_POLICY',
         p_margen_override_pct => 5
     );
-    ASSERT r.status = 'MARGIN_BELOW_MINIMUM', format('COMERCIAL debe bloquearse bajo el minimo, obtuve %s', r.status);
-    RAISE NOTICE 'PASSED - COMERCIAL bloqueado bajo el margen minimo';
+    ASSERT r.status = 'MARGIN_OVERRIDE_FORBIDDEN', format('COMERCIAL no debe poder enviar ningun override, obtuve %s', r.status);
+    RAISE NOTICE 'PASSED - COMERCIAL bloqueado al intentar override de margen';
 END;
 $$;
 

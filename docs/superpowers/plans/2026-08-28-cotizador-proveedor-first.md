@@ -63,13 +63,22 @@ El cotizador debe permitir:
 - Generar PDF desde datos persistidos.
 - Dejar todo trazable por snapshot, fuente, usuario, fecha y evento.
 
+Estado al 2026-08-28:
+
+- Implementado localmente hasta migración `074`.
+- No aplicado a STAGING/PROD.
+- La descarga PDF existente es MVP/no auditada para este pivote proveedor-first:
+  compila, pero el PDF E2E completo con cliente, validez, items comerciales,
+  registro en Storage, `cotizacion_documento` y evento `PDF_GENERADO` queda
+  fuera del alcance de las migraciones `069`-`074`.
+
 ## Fase 0 — Bitácora y seguridad operacional
 
 1. Antes de cualquier implementación, anexar este plan en `ESTADO_TRABAJO_CLAUDE.txt`.
 2. Trabajar en el worktree:
    `C:\Users\willi\Documents\Proyectos\Estampados\.claude\worktrees\cotizador-calculado`
-3. No tocar migraciones `000`-`068`.
-4. Crear nuevas migraciones desde el siguiente número disponible.
+3. No tocar migraciones `000`-`074`.
+4. Crear nuevas migraciones desde `075` o el siguiente número disponible.
 5. No hacer push, merge, deploy ni escribir en STAGING/PROD sin autorización explícita.
 
 ## Fase 1 — Modelo de datos proveedor-first
@@ -214,7 +223,7 @@ Reglas:
 
 ## Fase 5 — Persistencia de borrador, emisión y múltiples ítems
 
-Migración propuesta: `073_supplier_quote_draft_and_items.sql`
+Migración futura propuesta: `075_supplier_quote_draft_and_items.sql`
 
 Funciones:
 
@@ -236,7 +245,7 @@ Reglas:
 
 ## Fase 6 — APIs de búsqueda para la UI
 
-Migración propuesta: `074_supplier_quote_console_selectors.sql`
+Migración futura propuesta: `076_supplier_quote_console_selectors.sql`
 
 Funciones de lectura controlada:
 
@@ -284,6 +293,12 @@ Comportamiento visual:
 - Inspirado en el HTML viejo: claro, táctil, con desglose vivo, pero sin cálculo inseguro en cliente.
 
 ## Fase 8 — PDF y documento comercial
+
+Estado actual:
+
+- Existe descarga PDF MVP desde la página de cotización.
+- Para el pivote proveedor-first todavía no se declara PDF E2E completo.
+- La versión completa auditada de esta fase queda pendiente/futura.
 
 Archivos:
 

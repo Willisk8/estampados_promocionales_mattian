@@ -50,6 +50,36 @@ VALUES (
     'Fixture: caja x36 para probar costo unitario proveedor-first'
 );
 
+INSERT INTO tecnica_marcacion (id_tecnica, codigo, verification_status)
+VALUES ('00000000-0000-4000-fe00-000000000030', 'dtf_bloqueado_test', 'VERIFIED_PUBLIC_PRICE');
+
+INSERT INTO proveedor_tecnica_marcacion (id_proveedor_tecnica, source_id, nombre)
+VALUES ('00000000-0000-4000-fe00-000000000031', 'supplier_first_blocked_marking', 'Proveedor tecnica bloqueada');
+
+INSERT INTO precio_tecnica_marcacion_snapshot (
+    id_snapshot, id_tecnica, id_proveedor_tecnica, observation_id,
+    service_component, price_scope, size_label, quantity_min, quantity_max,
+    billing_unit, currency, price_value, fetched_at, verification_status
+)
+VALUES (
+    '00000000-0000-4000-fe00-000000000032',
+    '00000000-0000-4000-fe00-000000000030',
+    '00000000-0000-4000-fe00-000000000031',
+    'supplier-first-blocked-marking',
+    'marcacion', 'solo_marcacion', 'unidad bloqueada',
+    1, NULL, 'unidad', 'COP', 9999, now(), 'VERIFIED_PUBLIC_PRICE'
+);
+
+INSERT INTO curacion_precio_tecnica_marcacion (
+    id_snapshot, usage_status, formula_code, usage_notes
+)
+VALUES (
+    '00000000-0000-4000-fe00-000000000032',
+    'DO_NOT_USE',
+    'test_blocked',
+    'Fixture para probar que una curacion DO_NOT_USE no es cotizable por RPC directa.'
+);
+
 SELECT set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-fe00-000000000001"}', true);
 SET LOCAL ROLE authenticated;
 
@@ -135,6 +165,49 @@ $$;
 
 DO $$
 DECLARE
+    c RECORD;
+    r RECORD;
+    v_item RECORD;
+BEGIN
+    SELECT * INTO c
+      FROM fn_consola_previsualizar_cotizacion_proveedor(
+        p_id_precio_proveedor_snapshot => '00000000-0000-4000-fe00-000000000022',
+        p_cantidad => 37,
+        p_marking_lines => '[]'::jsonb,
+        p_transporte_total => 0
+      )
+     WHERE tipo_componente = 'PRODUCTO';
+
+    ASSERT c.status = 'OK', format('preview 37 unidades debe ser OK, obtuvo %s', c.status);
+    ASSERT c.costo_total = 185000,
+        format('politica de pack debe costear unidades consumidas 37*5000=185000, obtuvo %s', c.costo_total);
+
+    SELECT * INTO r
+      FROM fn_consola_crear_cotizacion_proveedor(
+        p_id_organizacion => '00000000-0000-4000-fe00-000000000010',
+        p_id_precio_proveedor_snapshot => '00000000-0000-4000-fe00-000000000022',
+        p_cantidad => 37,
+        p_marking_lines => '[]'::jsonb,
+        p_transporte_total => 0,
+        p_idempotency_key => 'supplier-first-pack-policy-037'
+      );
+
+    ASSERT r.status = 'OK', format('crear 37 unidades debe ser OK, obtuvo %s', r.status);
+
+    SELECT * INTO v_item
+      FROM cotizacion_item
+     WHERE id_cotizacion = r.id_cotizacion;
+
+    ASSERT v_item.cantidad_comprada = 72, format('37 unidades en caja x36 requieren comprar 72, obtuvo %s', v_item.cantidad_comprada);
+    ASSERT v_item.cantidad_usada = 37, format('cantidad_usada debe ser 37, obtuvo %s', v_item.cantidad_usada);
+    ASSERT v_item.cantidad_sobrante = 35, format('sobrante reutilizable esperado 35, obtuvo %s', v_item.cantidad_sobrante);
+
+    RAISE NOTICE 'PASSED - politica pack costea unidades consumidas y registra sobrante reutilizable';
+END;
+$$;
+
+DO $$
+DECLARE
     r1 RECORD;
     r2 RECORD;
 BEGIN
@@ -178,6 +251,7 @@ SET LOCAL ROLE authenticated;
 DO $$
 DECLARE
     c RECORD;
+    r RECORD;
 BEGIN
     SELECT * INTO c
       FROM fn_consola_previsualizar_cotizacion_proveedor(
@@ -193,6 +267,57 @@ BEGIN
     ASSERT c.precio_resultante IS NOT NULL, 'COMERCIAL si ve precio resultante';
 
     RAISE NOTICE 'PASSED - preview proveedor-first enmascara costos para COMERCIAL';
+
+    SELECT * INTO c
+      FROM fn_consola_previsualizar_cotizacion_proveedor(
+        p_id_precio_proveedor_snapshot => '00000000-0000-4000-fe00-000000000022',
+        p_cantidad => 12,
+        p_margen_override_pct => 40
+      );
+    ASSERT c.status = 'MARGIN_OVERRIDE_FORBIDDEN',
+        format('COMERCIAL no debe inyectar margen manual en preview proveedor-first, obtuvo %s', c.status);
+
+    SELECT * INTO r
+      FROM fn_consola_crear_cotizacion_proveedor(
+        p_id_organizacion => '00000000-0000-4000-fe00-000000000010',
+        p_id_precio_proveedor_snapshot => '00000000-0000-4000-fe00-000000000022',
+        p_cantidad => 12,
+        p_margen_override_pct => 40,
+        p_idempotency_key => 'supplier-first-commercial-margin-forbidden'
+      );
+    ASSERT r.status = 'MARGIN_OVERRIDE_FORBIDDEN',
+        format('COMERCIAL no debe inyectar margen manual al emitir proveedor-first, obtuvo %s', r.status);
+
+    SELECT * INTO c
+      FROM fn_consola_previsualizar_cotizacion_proveedor(
+        p_id_precio_proveedor_snapshot => '00000000-0000-4000-fe00-000000000022',
+        p_cantidad => 12
+      )
+     WHERE tipo_componente = 'PRODUCTO';
+    ASSERT c.metadata = '{}'::jsonb, format('COMERCIAL no debe recibir metadata sensible, obtuvo %s', c.metadata);
+    ASSERT NOT (c.metadata ? 'precio_publicado'), 'metadata COMERCIAL no debe exponer precio_publicado';
+
+    SELECT * INTO c
+      FROM fn_consola_previsualizar_cotizacion_proveedor(
+        p_id_precio_proveedor_snapshot => '00000000-0000-4000-fe00-000000000022',
+        p_cantidad => 12,
+        p_marking_lines => jsonb_build_array(jsonb_build_object('id_snapshot', '00000000-0000-4000-fe00-000000000032'))
+      );
+    ASSERT c.status = 'MARKING_COST_NOT_FOUND',
+        format('snapshot DO_NOT_USE directo debe ser rechazado en preview, obtuvo %s', c.status);
+
+    SELECT * INTO r
+      FROM fn_consola_crear_cotizacion_proveedor(
+        p_id_organizacion => '00000000-0000-4000-fe00-000000000010',
+        p_id_precio_proveedor_snapshot => '00000000-0000-4000-fe00-000000000022',
+        p_cantidad => 12,
+        p_marking_lines => jsonb_build_array(jsonb_build_object('id_snapshot', '00000000-0000-4000-fe00-000000000032')),
+        p_idempotency_key => 'supplier-first-blocked-marking'
+      );
+    ASSERT r.status = 'MARKING_COST_NOT_FOUND',
+        format('snapshot DO_NOT_USE directo debe ser rechazado al emitir, obtuvo %s', r.status);
+
+    RAISE NOTICE 'PASSED - COMERCIAL sin override, sin metadata sensible y sin snapshots DO_NOT_USE';
 END;
 $$;
 
