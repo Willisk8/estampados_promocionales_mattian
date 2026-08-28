@@ -36,12 +36,21 @@ export function DocumentoCotizacion({
           <Text style={styles.colDescripcion}>Concepto</Text>
           <Text style={styles.colPrecio}>Precio</Text>
         </View>
-        {componentes.map((c, i) => (
-          <View style={styles.fila} key={i}>
-            <Text style={styles.colDescripcion}>{c.descripcion}</Text>
-            <Text style={styles.colPrecio}>{cop(c.precio_resultante)}</Text>
+        {componentes.length === 0 ? (
+          <View style={styles.fila}>
+            <Text style={styles.colDescripcion}>
+              Sin desglose persistido; ver total.
+            </Text>
+            <Text style={styles.colPrecio}>—</Text>
           </View>
-        ))}
+        ) : (
+          componentes.map((c, i) => (
+            <View style={styles.fila} key={i}>
+              <Text style={styles.colDescripcion}>{c.descripcion}</Text>
+              <Text style={styles.colPrecio}>{cop(c.precio_resultante)}</Text>
+            </View>
+          ))
+        )}
 
         <Text style={styles.total}>Total: {cop(total)}</Text>
       </Page>

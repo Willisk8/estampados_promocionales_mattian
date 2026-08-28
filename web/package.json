@@ -12,7 +12,7 @@
     "start": "next start",
     "lint": "next lint",
     "check:privilegios": "node scripts/check-no-privileged-key.mjs",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/test-safe-internal-paths.mjs && node scripts/test-responsive-css.mjs",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/test-safe-internal-paths.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/test-pdf-fecha.mjs && node scripts/test-responsive-css.mjs",
     "verificar": "node -e \"process.env.NEXT_DIST_DIR='.next-verificacion';require('child_process').execSync('npx next build',{stdio:'inherit',env:process.env})\""
   },
   "dependencies": {

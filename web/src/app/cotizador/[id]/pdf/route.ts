@@ -1,6 +1,7 @@
 import { renderToBuffer } from "@react-pdf/renderer";
 import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
 import { DocumentoCotizacion } from "./documento";
+import { formatoFechaPdf } from "./formato";
 
 type ComponenteRpc = {
   descripcion: string;
@@ -29,10 +30,20 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const filas = (componentes ?? []) as ComponenteRpc[];
   const filasValidas = filas.filter((f) => f.status === "OK");
 
+  // I-3: una cotizacion sin componentes persistidos (flujo simple anterior,
+  // metodo_precio = TARIFA_PUBLICADA) no debe producir un PDF con tabla vacia
+  // que parezca un documento de cara al cliente sin ninguna linea de detalle.
+  if (filasValidas.length === 0) {
+    return new Response(
+      "PDF no disponible: esta cotizacion no tiene desglose de componentes persistido.",
+      { status: 409 },
+    );
+  }
+
   const buffer = await renderToBuffer(
     DocumentoCotizacion({
       numero: cotizacion.numero,
-      fecha: new Date(cotizacion.fecha_emision).toLocaleString("es-CO"),
+      fecha: formatoFechaPdf(cotizacion.fecha_emision as string | null),
       total: Number(cotizacion.total),
       componentes: filasValidas.map((f) => ({
         descripcion: f.descripcion,

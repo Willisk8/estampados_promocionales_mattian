@@ -59,7 +59,9 @@ export default async function DetalleCotizacion({
 
   const c = cotizacion as Cotizacion;
   const filas = (componentes ?? []) as Componente[];
+  const filasValidas = filas.filter((f) => f.status === "OK");
   const puedeVerCostos = sesion.rol === "ADMIN";
+  const puedeGenerarPdf = filasValidas.length > 0;
 
   return (
     <>
@@ -89,26 +91,24 @@ export default async function DetalleCotizacion({
             </tr>
           </thead>
           <tbody>
-            {filas
-              .filter((f) => f.status === "OK")
-              .map((f, index) => (
-                <tr key={`${f.tipo_componente}-${index}`}>
-                  <td>
-                    <span className="insignia">{f.tipo_componente}</span>
+            {filasValidas.map((f, index) => (
+              <tr key={`${f.tipo_componente}-${index}`}>
+                <td>
+                  <span className="insignia">{f.tipo_componente}</span>
+                </td>
+                <td>{f.descripcion}</td>
+                <td className="num">{Number(f.cantidad).toLocaleString("es-CO")}</td>
+                {puedeVerCostos && <td className="num">{cop(f.costo_unitario)}</td>}
+                {puedeVerCostos && <td className="num">{cop(f.costo_total)}</td>}
+                {puedeVerCostos && (
+                  <td className="num">
+                    {f.margen_aplicado_pct === null ? "—" : Number(f.margen_aplicado_pct).toLocaleString("es-CO")}
                   </td>
-                  <td>{f.descripcion}</td>
-                  <td className="num">{Number(f.cantidad).toLocaleString("es-CO")}</td>
-                  {puedeVerCostos && <td className="num">{cop(f.costo_unitario)}</td>}
-                  {puedeVerCostos && <td className="num">{cop(f.costo_total)}</td>}
-                  {puedeVerCostos && (
-                    <td className="num">
-                      {f.margen_aplicado_pct === null ? "—" : Number(f.margen_aplicado_pct).toLocaleString("es-CO")}
-                    </td>
-                  )}
-                  <td className="num">{cop(f.precio_resultante)}</td>
-                </tr>
-              ))}
-            {filas.length === 0 && (
+                )}
+                <td className="num">{cop(f.precio_resultante)}</td>
+              </tr>
+            ))}
+            {filasValidas.length === 0 && (
               <tr>
                 <td colSpan={puedeVerCostos ? 7 : 4} style={{ color: "var(--texto-suave)" }}>
                   Esta cotización no tiene componentes persistidos.
@@ -131,9 +131,19 @@ export default async function DetalleCotizacion({
           <button type="button" disabled title="Pendiente: generación/envío de PDF">
             Enviar PDF por correo
           </button>
-          <a href={`/cotizador/${id}/pdf`}>
-            <button type="button">Generar PDF</button>
-          </a>
+          {puedeGenerarPdf ? (
+            <a href={`/cotizador/${id}/pdf`}>
+              <button type="button">Generar PDF</button>
+            </a>
+          ) : (
+            <button
+              type="button"
+              disabled
+              title="PDF no disponible: esta cotización no tiene desglose de componentes persistido"
+            >
+              Generar PDF
+            </button>
+          )}
         </div>
       </div>
     </>
