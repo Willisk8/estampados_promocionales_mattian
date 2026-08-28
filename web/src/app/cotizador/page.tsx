@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
 import { SinAcceso } from "@/componentes/sin-acceso";
-import { crearCotizacionCalculada, prepararCotizacionCalculada, prepararPrevisualizacion } from "./acciones";
+import {
+  altaRapidaProveedor,
+  altaRapidaTecnica,
+  crearCotizacionCalculada,
+  prepararCotizacionCalculada,
+  prepararPrevisualizacion,
+} from "./acciones";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +76,7 @@ export default async function PaginaCotizador({
     previsualizar?: string;
     status?: string;
     error?: string;
+    ok?: string;
   }>;
 }) {
   const sesion = await obtenerSesionConsola();
@@ -161,6 +168,17 @@ export default async function PaginaCotizador({
         </div>
       )}
       {sp.error && <div className="aviso-caja">{sp.error}</div>}
+      {sp.ok === "proveedor" && (
+        <div className="aviso-caja neutro">
+          Proveedor creado. Revísalo en <a href="/proveedores">/proveedores</a>.
+        </div>
+      )}
+      {sp.ok === "tecnica" && (
+        <div className="aviso-caja neutro">
+          Técnica creada, pendiente de revisión en <a href="/tecnicas">/tecnicas</a>. No
+          aparecerá en el selector hasta que tenga un precio verificado.
+        </div>
+      )}
 
       <h2>1. Datos base</h2>
       <div className="tarjeta">
@@ -237,6 +255,23 @@ export default async function PaginaCotizador({
             Actualizar técnicas
           </button>
         </form>
+        <details style={{ marginTop: 12 }}>
+          <summary>+ Proveedor</summary>
+          <form action={altaRapidaProveedor} className="filtros" style={{ marginTop: 8 }}>
+            <input type="hidden" name="id_producto" value={sp.id_producto ?? ""} />
+            <input type="hidden" name="id_variante" value={sp.id_variante ?? ""} />
+            <input type="hidden" name="id_organizacion" value={sp.id_organizacion ?? ""} />
+            <input type="hidden" name="cantidad" value={sp.cantidad ?? ""} />
+            <input type="hidden" name="numero_preparaciones" value={sp.numero_preparaciones ?? ""} />
+            <input type="hidden" name="transporte_total" value={sp.transporte_total ?? ""} />
+            <input type="hidden" name="margen_override_pct" value={sp.margen_override_pct ?? ""} />
+            <input type="hidden" name="notas" value={sp.notas ?? ""} />
+            <input name="nombre_proveedor" placeholder="Nombre del proveedor nuevo" required disabled={!puedeCotizar} />
+            <button type="submit" disabled={!puedeCotizar}>
+              Crear proveedor
+            </button>
+          </form>
+        </details>
       </div>
 
       <h2>2. Elegir técnica y calcular precio</h2>
@@ -278,6 +313,27 @@ export default async function PaginaCotizador({
                 sin técnica usando costos base del producto.
               </p>
             )}
+            <details style={{ marginTop: 12 }}>
+              <summary>+ Técnica</summary>
+              <form action={altaRapidaTecnica} className="filtros" style={{ marginTop: 8 }}>
+                <input type="hidden" name="id_producto" value={sp.id_producto} />
+                <input type="hidden" name="id_variante" value={sp.id_variante ?? ""} />
+                <input type="hidden" name="id_organizacion" value={sp.id_organizacion ?? ""} />
+                <input type="hidden" name="cantidad" value={sp.cantidad} />
+                <input type="hidden" name="numero_preparaciones" value={sp.numero_preparaciones ?? "1"} />
+                <input type="hidden" name="transporte_total" value={sp.transporte_total ?? "0"} />
+                <input type="hidden" name="margen_override_pct" value={sp.margen_override_pct ?? ""} />
+                <input type="hidden" name="notas" value={sp.notas ?? ""} />
+                <input name="codigo_tecnica" placeholder="Código de técnica nueva" required disabled={!puedeCotizar} />
+                <button type="submit" disabled={!puedeCotizar}>
+                  Crear técnica
+                </button>
+              </form>
+              <p style={{ fontSize: 13, color: "var(--texto-suave)", marginBottom: 0, marginTop: 4 }}>
+                Queda pendiente de revisión: no aparecerá en el selector hasta tener un
+                precio verificado.
+              </p>
+            </details>
           </>
         )}
       </div>

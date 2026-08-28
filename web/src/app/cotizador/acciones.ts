@@ -69,6 +69,55 @@ export async function prepararPrevisualizacion(formData: FormData) {
   redirect(`/cotizador?${params.toString()}`);
 }
 
+const conservarEstado = (formData: FormData, params: URLSearchParams) => {
+  for (const campo of [
+    "id_producto",
+    "id_variante",
+    "id_organizacion",
+    "cantidad",
+    "id_tecnica",
+    "numero_preparaciones",
+    "transporte_total",
+    "margen_override_pct",
+    "notas",
+  ]) {
+    const valor = leerTexto(formData, campo);
+    if (valor) params.set(campo, valor);
+  }
+};
+
+export async function altaRapidaProveedor(formData: FormData) {
+  const nombre = leerTexto(formData, "nombre_proveedor");
+  const supabase = await crearClienteServidor();
+  const { error } = await supabase.rpc("fn_consola_crear_proveedor_rapido", { p_nombre: nombre });
+  revalidatePath("/proveedores");
+
+  const params = new URLSearchParams();
+  conservarEstado(formData, params);
+  if (error) {
+    params.set("error", error.message);
+  } else {
+    params.set("ok", "proveedor");
+  }
+  redirect(`/cotizador?${params.toString()}`);
+}
+
+export async function altaRapidaTecnica(formData: FormData) {
+  const codigo = leerTexto(formData, "codigo_tecnica");
+  const supabase = await crearClienteServidor();
+  const { error } = await supabase.rpc("fn_consola_crear_tecnica_rapida", { p_codigo: codigo });
+  revalidatePath("/tecnicas");
+
+  const params = new URLSearchParams();
+  conservarEstado(formData, params);
+  if (error) {
+    params.set("error", error.message);
+  } else {
+    params.set("ok", "tecnica");
+  }
+  redirect(`/cotizador?${params.toString()}`);
+}
+
 export async function crearCotizacionCalculada(formData: FormData) {
   const idProducto = leerTexto(formData, "id_producto");
   const idVariante = leerTexto(formData, "id_variante");
