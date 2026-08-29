@@ -1,0 +1,1032 @@
+ESTADO DE TRABAJO — sesión Claude Code (b8400185)
+Última actualización: 2026-08-28 (tarde)
+
+============================================================
+QUÉ ESTOY HACIENDO
+============================================================
+
+Implementando el "cotizador calculado": conecta el motor de cálculo de
+cotizaciones ya existente con una cotización real y persistida, con acceso
+ADMIN/COMERCIAL (costos/margen enmascarados para COMERCIAL), vista previa
+antes de confirmar, alta rápida de proveedor/técnica, y PDF.
+
+Documentos de referencia (committeados en master):
+- Spec:  docs/superpowers/specs/2026-08-27-cotizador-calculado-design.md
+- Plan:  docs/superpowers/plans/2026-08-27-cotizador-calculado.md (9 tasks)
+
+TODO EL TRABAJO ESTÁ EN UN WORKTREE AISLADO, NO EN MASTER:
+  .claude/worktrees/cotizador-calculado  (rama: worktree-cotizador-calculado)
+  base: commit 2a42687 sobre master
+Master sigue intacto. Si otra sesión/IA revisa el repo ahora, NO va a ver
+las migraciones 060-066 ni los cambios de web/src/app/cotizador/ todavía —
+están en ese worktree, no en master.
+
+Método: subagent-driven-development. Ledger completo (fuente de verdad de
+qué está hecho, con todos los hallazgos y decisiones) en:
+  .claude/worktrees/cotizador-calculado/.superpowers/sdd/2026-08-27-cotizador-calculado/progress.md
+LEER ESE LEDGER PRIMERO. Es más detallado que este archivo.
+
+============================================================
+LAS 9 TASKS DEL PLAN: TODAS COMPLETAS Y COMMITEADAS
+============================================================
+
+(Historia completa, con cada bug encontrado y cada decisión, en el ledger.
+Resumen aquí solo para orientarse rápido.)
+
+Task 1 — fn_quote_calculate_components_core (migración 060, commit 0564272):
+  extrae el cálculo a una función interna reutilizable sin guardia de rol.
+
+Task 2 — fn_consola_componentes_cotizacion (migración 061, commit 88df647):
+  lectura enmascarada por rol del desglose de una cotización.
+
+Task 3 — fn_consola_crear_cotizacion_calculada (migración 062, commits
+  12f3521, d674daa, 24525fa): función central que persiste una cotización
+  real. El implementador corrigió 6 bugs reales que tenía mi propio plan.
+
+Task 4 — fn_consola_tecnicas_disponibles_producto (migración 063, commits
+  8e614cf, 5cdf651): selector de técnicas con snapshot curado. El reviewer
+  encontró un Critical real (otro gap de mi plan): faltaba filtrar
+  price_value/moneda, ya corregido.
+
+IMPORTANTE — trabajo externo adoptado: mientras las Tasks 1-4 corrían, el
+usuario ejecutó OTRA herramienta de IA directo en este mismo worktree, sin
+avisar y sin commitear. Se encontró, se auditó a fondo (agente separado,
+verificación en vivo), y se adoptó: migración 064
+(idempotencia completa + filtro por cantidad) y el flujo de dos pasos del
+frontend (commit 2af6f4b, atribuido honestamente a "otra herramienta de IA
+del usuario", no a mí ni a un subagente mío).
+
+Esa auditoría encontró un problema de diseño real: el flujo externo emitía
+la cotización real apenas se elegía técnica, SIN vista previa — lo cual
+evitaba un bug real de MI PROPIO plan original (su paso de vista previa
+llamaba a una función ADMIN-only, que habría bloqueado a COMERCIAL), pero
+eliminaba la vista previa por completo, incluso para ADMIN. Le pregunté al
+usuario cómo seguir; eligió "agregar vista previa real". Se construyó:
+
+Task 6 (ampliada) — Vista previa real: fn_consola_previsualizar_cotizacion_calculada
+  (migración 065, commit 5df4270): calcula sin persistir, enmascarado por
+  rol, accesible a ADMIN+COMERCIAL. Verificado en vivo que el total
+  previsualizado coincide EXACTO con el total que se persiste después.
+  Frontend: nuevo paso 3 "previsualización y confirmación" en /cotizador.
+
+Task 5 — Alta rápida de proveedor/técnica (renumerada 064→066 por choque de
+  numeración con el trabajo externo; migración 066, commits 85d9dc9,
+  da9999b, b1f4ae6): dos funciones SQL + botones "+ Proveedor"/"+ Técnica"
+  en el cotizador. NOTA DE INTEGRIDAD: el implementador (subagente barato,
+  haiku) reportó DONE con una sección de "regresión completa" que
+  FABRICÓ — listaba archivos de test que no existen en el repo. No se le
+  creyó el reporte; se verificó todo de forma independiente (funciones en
+  vivo vía \df, tests reales re-ejecutados, checksum que el implementador
+  había dejado sin registrar corregido a mano). El bug real de fondo SÍ
+  estaba bien resuelto; solo el reporte de verificación era falso. Queda
+  registrado en el ledger como lección de proceso.
+
+Task 7 — Pantalla de revisión /cotizador/[id] (parte del commit 2af6f4b,
+  trabajo externo adoptado): componentes enmascarados por rol, botón de
+  correo deshabilitado como placeholder.
+
+Task 8 — PDF (commit 903a5fd, @react-pdf/renderer): ruta
+  /cotizador/[id]/pdf + botón "Generar PDF" real en la pantalla de
+  revisión. Verificado por build real (npm run verificar, compila limpio).
+  GAP CONOCIDO: nadie ha descargado un PDF real en un navegador — este
+  worktree no tiene web/.env.local con credenciales contra Supabase (ni
+  local ni STAGING), así que no se pudo correr el flujo end-to-end. Antes
+  de mergear, alguien debería hacer esa prueba manual una vez contra
+  STAGING.
+
+============================================================
+REVISIÓN FINAL DEL BRANCH (Task 9): YA CORRIÓ. Veredicto: READY WITH FIXES
+============================================================
+
+Un agente (opus) revisó las 13 commits originales contra el spec/plan,
+re-ejecutó los 23 tests SQL de forma independiente, y encontró 1 hallazgo
+Critical + 2 Important. Reporte completo en:
+  .claude/worktrees/cotizador-calculado/.superpowers/sdd/2026-08-27-cotizador-calculado/final-review-report.md
+(el ledger progress.md, mismo directorio, tiene el resumen con todo el
+detalle de cada uno — leer ese primero, es más completo que este archivo)
+
+YA CORREGIDO Y COMMITEADO (verificado en vivo, no solo por reporte):
+- CRITICAL (commit 3fc4cee): cotizacion_componente (tabla, desde
+  migración 038) tenía RLS mal configurado desde siempre — dejaba leer
+  costo/margen real a COMERCIAL/LECTURA por consulta directa a la tabla,
+  saltándose las funciones enmascaradas. Estaba dormido porque nadie
+  escribía filas reales ahí hasta este branch. Corregido con el mismo
+  patrón que costo_producto (solo ADMIN). Verificado en vivo antes/después.
+- IMPORTANT (commit f106446): la comparación de idempotencia de TRANSPORTE
+  (migración 064) usaba un valor post-margen como proxy del valor crudo
+  enviado — solo parecía funcionar porque hoy TRANSPORTE tiene margen 0%.
+  El reviewer lo reprodujo roto en los dos sentidos con una política de
+  margen distinta. Corregido leyendo el valor crudo guardado en el evento
+  de creación de la cotización. Verificado en vivo con una política de
+  prueba con margen 20% en transporte.
+
+PENDIENTE, NO BLOQUEANTE (quedó sin arreglar por límite de tokens de esta
+sesión — detalle exacto de qué cambiar en el ledger):
+- IMPORTANT: el botón "Generar PDF" está habilitado incluso para
+  cotizaciones viejas sin componentes persistidos (las del flujo simple
+  anterior) — genera un PDF con la tabla de ítems vacía pero el total
+  correcto. No es una fuga de datos ni un crash confirmado, es un gap de
+  UX para cotizaciones viejas, no para las nuevas. Fix concreto ya escrito
+  en el ledger, listo para que cualquiera lo aplique en minutos.
+
+============================================================
+LO QUE REALMENTE FALTA PARA CERRAR ESTE TRABAJO
+============================================================
+
+1. (Opcional, no bloqueante) Aplicar el fix de PDF de arriba.
+2. DECISIÓN DEL USUARIO, no mía: cómo mergear esta rama a master. El plan
+   original asumía push directo a origin/master, pero este trabajo se
+   construyó deliberadamente en un worktree aislado — nunca se decidió el
+   mecanismo real de merge. No asumir nada acá, preguntar.
+3. Falta una pasada manual real en navegador contra STAGING (crear una
+   cotización como ADMIN y como COMERCIAL, confirmar la vista previa, el
+   enmascaramiento en pantalla, y descargar un PDF real). Todo lo demás en
+   este plan se verificó a nivel de SQL/build, nunca end-to-end en
+   navegador — este worktree no tiene web/.env.local contra un Supabase
+   real.
+4. Recién después de 2 y 3: correr superpowers:finishing-a-development-branch
+  y borrar .superpowers/sdd/2026-08-27-cotizador-calculado/.
+
+============================================================
+PIVOTE "PROVEEDOR-FIRST" — CONFIRMADO POR EL USUARIO, ADOPTADO (commit 9b54113)
+============================================================
+
+El usuario CONFIRMÓ que este pivote fue pedido explícitamente por él a su
+otra herramienta de IA: el flujo que esta sesión construyó (060-068,
+basado en elegir un producto PROPIO activo) "no funcionaba en la
+interfaz" cuando lo probó de verdad — en la práctica ningún producto
+propio está ACTIVE, así que el cotizador que hicimos era inusable para
+cotizar algo real. NO fue un cambio no autorizado; fue un pedido directo
+del usuario a otra herramienta, motivado por un fallo de usabilidad real
+de lo que esta sesión entregó (fallo que nunca se detectó porque ESTA
+SESIÓN NUNCA PROBÓ LA INTERFAZ EN UN NAVEGADOR — toda la verificación de
+las Tasks 1-8 fue a nivel SQL o de compilación, ese hueco quedó advertido
+varias veces en este mismo archivo antes de que esto pasara).
+
+QUÉ ES: un camino nuevo para armar una cotización directo desde un
+PROVEEDOR real -> su producto -> su precio vigente (snapshot) -> técnica
+de marcación con su propio proveedor y costo — en vez de partir de un
+producto del catálogo propio. Basado en el HTML de referencia
+cotizador-v2.html. Alta rápida de proveedor/producto/precio/técnica
+manual queda en PENDING_REVIEW/MANUAL_COTIZADOR, auditable.
+Plan completo: docs/superpowers/plans/2026-08-28-cotizador-proveedor-first.md
+
+YA VERIFICADO POR ESTA SESIÓN (no por la otra IA) Y COMMITEADO (9b54113):
+- Las 4 migraciones nuevas (069-072, ~1337 líneas de SQL) aplican limpio
+  en orden contra Postgres.
+- Sus propios 7 tests (test_quote_supplier_first.sql) pasan en vivo.
+- La suite de regresión COMPLETA (26 archivos, todo 000→072) sigue en
+  verde — no rompió nada de lo anterior.
+- npm run verificar (build + typecheck del frontend reescrito) compila
+  limpio.
+- web/.env.local fue copiado al worktree (apunta a STAGING) para que se
+  pueda levantar la app real con `cd web && npm run dev`.
+
+NO VERIFICADO TODAVÍA (se acabó el presupuesto de tokens de la sesión):
+- Revisión de código línea por línea del SQL nuevo (RLS, enmascaramiento
+  para COMERCIAL/LECTURA, seguridad de las funciones de búsqueda) — esta
+  misma sesión encontró un hueco Critical real (C-1) en código que a
+  simple vista parecía correcto; no está descartado que exista algo
+  similar acá.
+- NADIE probó el flujo nuevo en un navegador real todavía. El problema que
+  motivó este pivote (la interfaz vieja "no funcionaba") tampoco está
+  descartado para la interfaz nueva — que los tests SQL y el build pasen
+  NO prueba que la UI funcione bien, como ya demostró la experiencia
+  anterior de esta misma sesión.
+- No se decidió qué pasa con el flujo viejo (basado en catálogo propio,
+  migraciones 060-068, función fn_consola_crear_cotizacion_calculada):
+  sigue existiendo en el código en paralelo al nuevo. ¿Coexisten? ¿Se
+  saca el viejo?
+- La revisión final de todo el branch (Task 9, ya hecha, veredicto READY
+  WITH FIXES) fue ANTES de este pivote — NO cubre las migraciones 069-072
+  ni el frontend reescrito. Hace falta una revisión final nueva que cubra
+  todo, no solo 060-068.
+
+PRÓXIMOS PASOS EN ORDEN DE PRIORIDAD (detalle completo en el ledger, ver
+abajo): (1) abrir la app en un navegador real y probar el flujo nuevo como
+ADMIN y COMERCIAL — confirmar que sí funciona donde el viejo no; (2)
+revisión de código real de 069-072 enfocada en RLS/enmascaramiento; (3)
+decidir con el usuario qué pasa con el flujo viejo; (4) revisión final de
+todo el branch de nuevo, una vez resuelto lo anterior.
+
+============================================================
+CÓMO VERIFICAR CUALQUIER COSA DE ESTO (Postgres local, no toca STAGING)
+============================================================
+
+Postgres local ya está corriendo en localhost:5432 (base estampados_test).
+Antes de correr tests o migraciones:
+  $env:PATH = "C:\Users\willi\pgsql16\bin;" + $env:PATH
+  $env:DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/estampados_test"
+Luego, desde DENTRO del worktree (.claude/worktrees/cotizador-calculado):
+  .\scripts\run_db_tests.ps1          # suite completa, 23 archivos
+  cd web && npm run verificar         # build + typecheck del frontend
+
+TRAMPA de PowerShell 5.1: nunca uses "2>&1" en llamadas a psql — envuelve
+las líneas NOTICE (que psql manda a stderr) como error y aborta el comando
+aunque haya salido bien. Correr psql sin redirigir stderr.
+
+============================================================
+PARA OTRA IA/SESIÓN QUE LEA ESTO
+============================================================
+
+- El worktree .claude/worktrees/cotizador-calculado tiene TODO commiteado
+  ahora mismo (git status limpio al escribir esto) — es seguro leerlo o
+  incluso seguir trabajando ahí si hace falta, pero avisá primero si hay
+  otra sesión de Claude activa (puede haber un agente de revisión final
+  corriendo en background en este momento).
+- master está limpio y actualizado — seguro trabajar ahí en paralelo en
+  algo NO relacionado al cotizador.
+- Si el usuario menciona que ya no tiene tokens/contexto en esta sesión:
+  el ledger del worktree (ruta arriba) tiene el historial completo con
+  cada decisión y su razón — leelo antes de asumir que hay que rehacer
+  algo. Las 9 tasks del plan están completas; lo único que falta es el
+  veredicto de la revisión final (Task 9) y la decisión de merge.
+- Memoria persistente de Claude (para contexto de todo el proyecto, no solo
+  este worktree): ver session_log_estampados.md y worktree_cotizador_calculado.md
+  en el índice de memoria del usuario (MEMORY.md).
+
+============================================================
+ANEXO CODEX — 2026-08-28
+============================================================
+
+Instrucción nueva del usuario:
+  Este archivo pasa a ser bitácora operativa obligatoria. Todo cambio,
+  plan, hallazgo pendiente o decisión que se haga desde Codex/Claude debe
+  quedar anexado aquí para que otras sesiones no trabajen con memoria
+  desactualizada.
+
+Revisión rápida hecha por Codex:
+  - Archivo leído completo.
+  - Worktree principal observado: master...origin/master, con .claude/ y
+    ESTADO_TRABAJO_CLAUDE.txt sin trackear.
+  - Worktree aislado observado:
+      .claude/worktrees/cotizador-calculado
+    Estado: limpio al momento de esta revisión.
+  - No se hizo push, merge, deploy ni cambio en PROD.
+
+Pendientes vigentes según esta bitácora:
+  1. Decidir con el usuario cómo mergear worktree-cotizador-calculado hacia
+     master.
+  2. Hacer prueba manual real contra STAGING del flujo ADMIN/COMERCIAL:
+     crear cotización calculada, revisar preview, validar enmascaramiento y
+     descargar PDF.
+  3. Opcional no bloqueante: ajustar el botón/flujo de PDF para cotizaciones
+     antiguas sin componentes persistidos.
+  4. Antes de cualquier cierre o merge, verificar estado Git y evitar commit
+     parcial de archivos requeridos.
+
+Regla operativa para próximas acciones:
+  Si Codex modifica archivos, crea planes, ejecuta fixes o recibe nuevos
+  hallazgos QA, debe agregar un anexo nuevo en este archivo con fecha,
+  alcance, archivos tocados, validaciones ejecutadas y pendientes restantes.
+
+============================================================
+ANEXO CODEX — 2026-08-28 — revisión de memoria Claude/ledger SDD
+============================================================
+
+Fuentes adicionales revisadas por solicitud del usuario:
+  - C:\Users\willi\.claude\projects\C--Users-willi\memory\MEMORY.md
+  - C:\Users\willi\.claude\projects\C--Users-willi\memory\worktree_cotizador_calculado.md
+  - C:\Users\willi\Documents\Proyectos\Estampados\.claude\worktrees\cotizador-calculado\.superpowers\sdd\2026-08-27-cotizador-calculado\progress.md
+
+Conclusión corregida:
+  El resumen anterior de Codex se quedó corto. Según el ledger SDD y la
+  memoria persistente de Claude, el worktree cotizador-calculado no va solo
+  hasta 064; la rama aislada ya tiene implementaciones/correcciones hasta
+  migración 068.
+
+Estado real del trabajo cotizador-calculado según ledger:
+  - Worktree:
+      C:\Users\willi\Documents\Proyectos\Estampados\.claude\worktrees\cotizador-calculado
+  - Rama:
+      worktree-cotizador-calculado
+  - Base:
+      2a42687771afe1b0d123628dd52e110f57e86a9c
+  - HEAD reportado en ledger:
+      f106446
+  - Total reportado:
+      18 commits sobre el worktree.
+  - Tasks originales del plan:
+      9/9 completas.
+
+Migraciones relevantes del worktree según ledger:
+  - 060: núcleo interno de cálculo de componentes.
+  - 061: lectura enmascarada de componentes de cotización.
+  - 062: creación de cotización calculada persistida.
+  - 063: selector de técnicas disponibles.
+  - 064: idempotencia completa + filtro por cantidad.
+  - 065: previsualización real sin persistir, enmascarada por rol.
+  - 066: alta rápida de proveedor/técnica.
+  - 067: RLS ADMIN-only en cotizacion_componente para evitar fuga de
+         costo/margen por consulta directa.
+  - 068: idempotencia de transporte usando valor crudo del evento, no precio
+         post-margen.
+
+Hallazgos cerrados según ledger:
+  - QA-CALC-001: corregido por 064.
+  - QA-CALC-002: corregido por 064.
+  - QA-CALC-003: resuelto por integración UI server-side, vista previa real
+    y detalle /cotizador/[id].
+  - Fuga de costos/márgenes por RLS en cotizacion_componente: corregida por
+    067 y verificada en vivo.
+  - Idempotencia de transporte con margen distinto de 0%: corregida por 068
+    y verificada en vivo.
+
+Pendiente vigente, no bloqueante según ledger:
+  - El botón "Generar PDF" queda habilitado para cotizaciones antiguas del
+    flujo simple que no tienen componentes persistidos. El PDF podría salir
+    con tabla vacía y total correcto. No es fuga ni crash confirmado; es gap
+    UX para cotizaciones viejas.
+  - Fix sugerido:
+      1. En web/src/app/cotizador/[id]/pdf/route.ts, proteger
+         fecha_emision NULL antes de new Date(...).
+      2. En web/src/app/cotizador/[id]/page.tsx, ocultar/deshabilitar
+         "Generar PDF" si no hay componentes, o hacer que documento.tsx
+         muestre una línea "sin desglose disponible, ver total".
+
+Pendientes operativos antes de cerrar/mergear:
+  1. Usuario debe decidir mecanismo de merge del worktree hacia master.
+     No asumir push directo.
+  2. Hacer prueba manual real en navegador contra STAGING:
+     ADMIN y COMERCIAL, preview, enmascaramiento, emisión, detalle y descarga
+     de PDF.
+  3. Solo después de lo anterior correr el cierre de rama/desarrollo y borrar
+     el ledger SDD si se decide hacerlo.
+
+Notas de proceso importantes desde memoria:
+  - No confiar solo en reportes de subagentes; cruzar evidencia con repo/DB.
+  - Antes de push/merge, verificar contra estado limpio o clon limpio.
+  - No incluir Co-Authored-By en commits.
+  - El usuario puede tener varias sesiones trabajando en paralelo; coordinar
+    antes de tocar el mismo worktree.
+
+Acción realizada por Codex en este anexo:
+  Solo documentación/bitácora. No se modificó el worktree cotizador-calculado,
+  no se hizo push, no se hizo merge, no se tocó STAGING ni PROD.
+
+============================================================
+ANEXO CODEX — 2026-08-28 — plan cotizador proveedor-first
+============================================================
+
+Nueva solicitud del usuario:
+  Rediseñar el cotizador porque la pantalla actual no es funcional ni se
+  parece al cotizador HTML de referencia:
+    C:\Users\willi\Downloads\cotizador-v2.html
+
+  El flujo requerido ya no debe arrancar desde "producto propio activo",
+  sino desde:
+    cliente -> proveedor -> producto del proveedor -> costo proveedor ->
+    tecnica/proveedor de tecnica -> costo tecnica -> calculo ->
+    previsualizacion -> borrador/emision -> PDF.
+
+Plan creado:
+  C:\Users\willi\Documents\Proyectos\Estampados\.claude\worktrees\cotizador-calculado\docs\superpowers\plans\2026-08-28-cotizador-proveedor-first.md
+
+Conclusiones de revision:
+  - El cotizador actual del worktree ya usa fn_consola_previsualizar_cotizacion_calculada()
+    y fn_consola_crear_cotizacion_calculada(), pero todavia parte de
+    producto propio ACTIVE.
+  - La base ya tiene proveedor, producto_proveedor, precio_proveedor_snapshot,
+    tecnica_marcacion, proveedor_tecnica_marcacion y
+    precio_tecnica_marcacion_snapshot.
+  - El bloqueo estructural es que cotizacion_item.id_producto es NOT NULL y
+    el motor vigente calcula PRODUCTO desde costo_producto. Para cotizar
+    productos conocidos de proveedores se necesitan migraciones nuevas, no
+    solo cambios visuales.
+  - El alta rapida actual solo crea nombre de proveedor o codigo de tecnica;
+    falta alta rapida auditada de producto, precio, proveedor de tecnica y
+    snapshot de costo.
+
+Decisiones del plan:
+  - Trabajar en el mismo worktree aislado:
+      .claude/worktrees/cotizador-calculado
+  - No tocar migraciones 000-068.
+  - Crear nuevas migraciones desde el siguiente numero disponible.
+  - Mantener resolve_price() como tarifa publicada opcional, no como motor
+    obligatorio del cotizador.
+  - Permitir cotizar desde producto_proveedor sin requerir producto propio.
+  - Todo dato manual creado desde el cotizador debe quedar MANUAL_COTIZADOR
+    y PENDING_REVIEW; puede usarse en la cotizacion actual, pero no debe
+    entrar a seleccion automatica futura hasta aprobacion ADMIN.
+  - ADMIN y COMERCIAL pueden crear datos manuales; solo ADMIN aprueba.
+  - COMERCIAL puede ver costos para operar la cotizacion, pero no margen
+    interno ni ganancia.
+
+Fases propuestas:
+  0. Bitacora y seguridad operacional.
+  1. Modelo cotizacion_item proveedor-first.
+  2. Vincular proveedor_tecnica_marcacion con proveedor.
+  3. Alta manual auditada de proveedor/producto/precio y tecnica/costo.
+  4. Motor de calculo desde precio_proveedor_snapshot.
+  5. Borrador, emision, multiples items e idempotencia completa.
+  6. RPCs de busqueda para proveedores, productos, ofertas y tecnicas.
+  7. Rediseño visual de /cotizador inspirado en cotizador-v2.html.
+  8. PDF comercial desde snapshot persistido.
+  9. Pruebas SQL/frontend/responsive/STAGING manual autorizado.
+  10. Envio a QA externo y loop de hallazgos.
+
+Pendientes inmediatos:
+  1. Usuario debe aprobar si se implementa este plan completo en el worktree
+     cotizador-calculado.
+  2. Antes de implementar, verificar siguiente numero de migracion disponible.
+  3. Implementar primero modelo proveedor-first y calculo desde snapshots,
+     porque la UI depende de esos contratos.
+  4. Despues de cada cambio, actualizar este archivo con alcance, archivos
+     tocados, validaciones y pendientes.
+
+Accion realizada por Codex en este anexo:
+  Documentacion/plan solamente. Se creo un archivo de plan dentro del
+  worktree cotizador-calculado y se actualizo esta bitacora. No se hizo
+  push, merge, deploy ni escritura en STAGING/PROD.
+
+============================================================
+ANEXO CODEX — 2026-08-28 — avance implementado proveedor-first
+============================================================
+
+Alcance implementado en worktree aislado:
+  C:\Users\willi\Documents\Proyectos\Estampados\.claude\worktrees\cotizador-calculado
+
+Archivos creados:
+  - database/migrations/069_supplier_first_quote_bridge.sql
+  - database/migrations/070_supplier_first_quote_selectors.sql
+  - database/migrations/071_supplier_first_marking_selectors.sql
+  - database/tests/test_quote_supplier_first.sql
+  - docs/superpowers/plans/2026-08-28-cotizador-proveedor-first.md
+
+Archivos modificados:
+  - database/migrations/CHECKSUMS.txt
+  - web/src/app/cotizador/acciones.ts
+  - web/src/app/cotizador/page.tsx
+  - ESTADO_TRABAJO_CLAUDE.txt (raiz del proyecto, esta bitacora)
+
+Que quedo implementado:
+  1. cotizacion_item ahora puede soportar source_mode:
+       OWN_PRODUCT, SUPPLIER_PRODUCT, MANUAL.
+  2. Una cotizacion puede nacer desde producto_proveedor +
+     precio_proveedor_snapshot sin requerir producto propio ACTIVE.
+  3. El item congela snapshot de proveedor, nombre, SKU proveedor, costo
+     unitario estimado, unidad de compra, cantidad_pack, cantidad comprada,
+     cantidad usada y sobrante.
+  4. Nuevo calculo proveedor-first:
+       fn_quote_calculate_supplier_components_core()
+     calcula componente PRODUCTO desde precio_proveedor_snapshot.
+  5. Nueva previsualizacion:
+       fn_consola_previsualizar_cotizacion_proveedor()
+     enmascara costos/margenes para COMERCIAL.
+  6. Nueva creacion:
+       fn_consola_crear_cotizacion_proveedor()
+     persiste cotizacion, item, componentes, evento CREADA e idempotencia.
+  7. Nuevos selectores para UI:
+       fn_consola_buscar_proveedores_producto()
+       fn_consola_buscar_productos_proveedor()
+       fn_consola_ofertas_producto_proveedor()
+       fn_consola_buscar_snapshots_tecnica_marcacion()
+  8. /cotizador fue reemplazado por una primera UI proveedor-first:
+       cliente -> proveedor -> producto proveedor -> oferta/costo ->
+       tecnica opcional -> medidas/preparacion -> transporte ->
+       preview -> emitir.
+
+Validaciones ejecutadas localmente:
+  - apply_pending_migrations.ps1: OK, aplico 069-071 en Postgres local.
+  - database/tests/test_quote_supplier_first.sql: OK.
+  - scripts/run_db_tests.ps1: OK, suite SQL completa.
+  - npm test: OK.
+  - npm run build: OK, pero requirio permiso fuera del sandbox porque el
+    intento normal fallo con spawn EPERM.
+  - git diff --check: OK, solo warnings LF/CRLF en archivos web.
+  - python scripts/audit_change.py --file 069: OK.
+  - python scripts/audit_change.py --file 070: OK.
+  - python scripts/audit_change.py --file 071: OK.
+  - python scripts/audit_change.py --file test_quote_supplier_first.sql: OK.
+  - python scripts/audit_change.py --all: 0 errores, 1 warning preexistente
+    sobre 060/search_path ya documentado en el ledger como falso positivo
+    del auditor.
+
+Limitaciones conocidas de esta primera implementacion:
+  - Aun no existe alta manual completa de producto proveedor + precio desde
+    la UI. Sigue pendiente segun el plan.
+  - Aun no existe alta manual completa de proveedor de tecnica + snapshot
+    de costo desde la UI. Sigue pendiente segun el plan.
+  - El flujo proveedor-first implementado emite una cotizacion de un item;
+    el borrador multi-item editable sigue pendiente.
+  - No se hizo prueba visual real en navegador ni descarga PDF contra
+    STAGING.
+  - No se hizo push, merge, deploy ni escritura en STAGING/PROD.
+
+Pendientes inmediatos recomendados:
+  1. Implementar alta manual auditada de proveedor/producto/precio y
+     tecnica/costo (PENDING_REVIEW, MANUAL_COTIZADOR).
+  2. Implementar borrador multi-item editable antes de considerar completa
+     la experiencia de cotizacion.
+  3. Mejorar visualmente la pantalla para acercarla mas al HTML original:
+     panel de escenarios, resumen fijo, mejor desglose por unidad/total.
+  4. Probar manualmente en navegador contra STAGING solo cuando el usuario
+     autorice aplicar 069-071.
+  5. Enviar estos cambios al chat de QA cuando el usuario lo indique.
+
+Estado Git al cierre de este anexo:
+  Worktree cotizador-calculado con cambios sin commit. No hacer commit
+  parcial: incluir juntos migraciones 069-071, test_quote_supplier_first,
+  CHECKSUMS, acciones.ts, page.tsx y el plan nuevo.
+
+ANEXO CODEX — 2026-08-28 — verificacion post-commit proveedor-first
+---------------------------------------------------------------------
+Contexto:
+  El usuario indico que otro agente alcanzo a mandar commits y pidio
+  revisar memoria/bitacoras antes de continuar.
+
+Estado real observado:
+  - Worktree: C:\Users\willi\Documents\Proyectos\Estampados\.claude\worktrees\cotizador-calculado
+  - Rama: worktree-cotizador-calculado
+  - HEAD: 9b54113 feat(proveedor-first): adopt supplier-first quoting pivot from user's other AI tool
+  - git status: limpio.
+
+Confirmacion importante:
+  El commit 9b54113 ya incluye:
+    - migraciones 069, 070, 071 y 072;
+    - CHECKSUMS actualizado hasta 072;
+    - test_quote_supplier_first.sql;
+    - plan proveedor-first;
+    - UI proveedor-first en /cotizador;
+    - acciones server para alta manual de producto/precio proveedor;
+    - acciones server para alta manual de tecnica/costo.
+
+Correccion de bitacora:
+  En el anexo anterior todavia aparecian como pendientes las altas manuales
+  completas desde UI. Esa informacion quedo desactualizada: ya estan incluidas
+  en el commit 9b54113 y cubiertas por la migracion 072.
+
+Validaciones ejecutadas por Codex en esta reanudacion:
+  - git log/status: confirma commit 9b54113 y worktree limpio.
+  - database/tests/test_quote_supplier_first.sql: ya habia pasado en la
+    reanudacion anterior tras la 072.
+  - scripts/run_db_tests.ps1: ya habia pasado suite SQL completa tras la 072.
+  - npm test: ya habia pasado.
+  - python scripts/audit_change.py --all: ya habia pasado con 0 errores y 1
+    warning historico de 060/search_path.
+  - npm run build: OK en esta reanudacion; el intento normal del sandbox falla
+    con spawn EPERM, pero el build fuera del sandbox compilo correctamente.
+
+Pendientes reales despues de este punto:
+  1. Prueba visual/manual en navegador contra STAGING antes de declarar usable
+     la experiencia completa.
+  2. Reauditoria QA final del pivote proveedor-first 069-072, porque la revision
+     anterior cubria principalmente 060-068.
+  3. Decidir si el flujo viejo de catalogo propio calculado 060-068 se conserva
+     como backend alterno, se oculta o se retira de la UI.
+  4. Borrador multi-item editable.
+  5. Mejoras visuales tipo cotizador-v2.html: resumen fijo, escenarios, desglose
+     unitario/total mas claro y experiencia mas cercana al HTML original.
+  6. PDF/send E2E real: descargar PDF desde una cotizacion proveedor-first y
+     verificar que no exponga costos/margenes a roles no ADMIN.
+  7. No se hizo push, merge, deploy ni escritura en STAGING/PROD.
+
+ANEXO CODEX — 2026-08-28 — intento de validacion visual local
+---------------------------------------------------------------
+Validacion realizada:
+  - Se levanto `npm run dev` en el worktree del cotizador.
+  - URL local disponible: http://localhost:3000
+  - Se abrio http://localhost:3000/cotizador en el navegador integrado.
+
+Resultado:
+  - La app redirigio correctamente a:
+      /login?siguiente=%2Fcotizador
+  - No hubo errores de consola visibles en esa carga.
+  - Chrome no esta disponible/conectado al plugin de navegador, por lo que no
+    fue posible reutilizar una sesion autenticada externa.
+
+Conclusion:
+  - Build y tests pasan, pero la prueba visual completa de /cotizador sigue
+    pendiente porque requiere iniciar sesion en el navegador usado para la
+    validacion.
+  - No se enviaron formularios, no se creo cotizacion y no se escribio en
+    STAGING/PROD desde el navegador.
+
+ANEXO CODEX — 2026-08-28 — cierre hallazgos H-073/P1 proveedor-first
+------------------------------------------------------------------------
+Hallazgos recibidos:
+  - H-073-001: COMERCIAL podia inyectar margen_override_pct por URL/FormData.
+  - P1 masking: preview proveedor-first ocultaba columnas de costo, pero dejaba
+    metadata con precio_publicado/price_value/line_unit_cost.
+  - P1 curacion: selector ocultaba snapshots DO_NOT_USE, pero el core/RPC podia
+    recibir el id_snapshot directo.
+  - P2 pack policy: productos por caja/pack costean unidades consumidas y
+    registran sobrante, pero faltaba test/documentacion explicita.
+
+Correcciones implementadas localmente en worktree-cotizador-calculado:
+  - Nueva migracion 073_block_margin_override_for_non_admin.sql:
+      * wrappers server-side para preview/emision del flujo calculado propio;
+      * wrappers server-side para preview/emision proveedor-first;
+      * COMERCIAL con margen_override_pct devuelve MARGIN_OVERRIDE_FORBIDDEN;
+      * helper interno fn_quote_supplier_marking_lines_usable(JSONB);
+      * snapshots de tecnica con curacion DO_NOT_USE devuelven
+        MARKING_COST_NOT_FOUND en preview/emision proveedor-first;
+      * preview proveedor-first devuelve metadata completa solo para ADMIN y
+        '{}' para COMERCIAL.
+  - Nueva migracion 074_fix_supplier_preview_wrapper_alias.sql:
+      * corrige alias del wrapper de preview proveedor-first creado en 073.
+  - Tests ampliados:
+      * test_quote_calculada_preview.sql: COMERCIAL no puede override en preview.
+      * test_quote_calculada.sql: COMERCIAL no puede override al emitir.
+      * test_quote_supplier_first.sql: COMERCIAL sin metadata sensible,
+        override prohibido, DO_NOT_USE rechazado y politica pack x36/37
+        documentada por prueba.
+
+Decision documentada sobre packs:
+  Para el MVP, si el proveedor obliga comprar caja/pack, el cotizador calcula
+  costo unitario del pack y costea las unidades consumidas por la cotizacion.
+  La cantidad comprada completa y el sobrante quedan registrados en
+  cotizacion_item como inventario/sobrante reutilizable. Ejemplo probado:
+  caja x36 por 180.000, cotizar 37 unidades => costo consumido 37*5.000,
+  cantidad_comprada 72 y cantidad_sobrante 35.
+
+Validaciones ejecutadas:
+  - apply_pending_migrations.ps1: OK, aplico/validó 073-074 localmente.
+  - test_quote_calculada_preview.sql: OK.
+  - test_quote_calculada.sql: OK.
+  - test_quote_supplier_first.sql: OK.
+  - scripts/run_db_tests.ps1: OK, suite SQL completa.
+  - backfill_migration_checksums.py --apply --recompute: OK, CHECKSUMS hasta 074.
+  - git diff --check: OK.
+  - python scripts/audit_change.py --all: 0 errores, 1 warning historico
+    060/search_path.
+  - npm test: OK.
+  - npm run build: OK fuera del sandbox; dentro del sandbox sigue fallando
+    por spawn EPERM.
+
+Pendiente:
+  - Reauditoria de QA sobre 073-074.
+  - Commit atomico de 073-074 + tests + CHECKSUMS si QA lo aprueba.
+  - Prueba UI autenticada/PDF E2E sigue pendiente.
+  - No se hizo push, merge, deploy ni escritura en STAGING/PROD.
+
+ANEXO CODEX — 2026-08-28 — respuesta QA-074-DOC-002 / PDF scope
+-----------------------------------------------------------------
+Hallazgos recibidos:
+  - QA-074-GIT-001: cambios 073-074 y tests estaban sin commit.
+  - QA-074-DOC-002: plan proveedor-first reservaba 073/074 para migraciones
+    futuras, pero esos numeros ya existen.
+  - QA-PDF-003: PDF actual no cumple contrato completo de PDF E2E auditado
+    con documento/evento/Storage.
+
+Correcciones documentales realizadas:
+  - docs/superpowers/plans/2026-08-28-cotizador-proveedor-first.md:
+      * marca estado implementado local hasta 074;
+      * indica no tocar 000-074;
+      * renumera futuras migraciones de borrador/selectores desde 075/076;
+      * aclara que PDF actual es descarga MVP/no auditada para este pivote y
+        que PDF E2E completo queda pendiente.
+  - README.md:
+      * actualiza estado de migraciones a 000-074;
+      * describe 069-072 y 073-074;
+      * actualiza proximo paso de sincronizacion staging a 000-074.
+
+Decision de alcance:
+  - QA-PDF-003 no se implementa en este ciclo; queda explicitamente fuera del
+    alcance del merge proveedor-first si se declara solo DB/UI cotizador.
+  - PDF E2E completo sigue pendiente antes de afirmar cierre documental final.
+
+Pendiente inmediato:
+  - Hacer commit atomico local con 073-074, tests, CHECKSUMS, README y plan.
+  - Reenviar a QA para reauditoria del commit.
+================================================================
+ANEXO CLINE (COORDINADOR QA/ARQUITECTURA) — 2026-08-28 — AUDITORÍA
+INICIAL READ ONLY + PLAN DE AJUSTE PRIORIZADO
+================================================================
+
+Rol asumido: PRINCIPAL SOFTWARE ENGINEERING ASSURANCE COORDINATOR.
+Modo: AUDIT / READ ONLY. No se modificó código, no se ejecutó migración,
+no se hizo push/merge/deploy, no se escribió en STAGING/PROD.
+
+Objetivo del usuario en esta sesión:
+  "Asume este rol y trabaja en ajustar el proyecto" + regla de memoria:
+  todo cambio/plan debe quedar registrado en esta bitácora y, cuando
+  aplique, en el ledger SDD del worktree.
+
+----------------------------------------------------------------
+1. ESTADO OBSERVADO (evidencia, no inferencia)
+----------------------------------------------------------------
+- master: limpio, migraciones 000-059, staging sincronizada con origin.
+- Worktree .claude/worktrees/cotizador-calculado (rama
+  worktree-cotizador-calculado, base 2a42687, HEAD 948c7bb,
+  20 commits): migraciones 060-074, ~23 tests SQL verdes
+  (154 asserts), frontend web/src/app/cotizador* reescrito
+  (flujo proveedor-first + flujo calculado propio), PDF MVP
+  (@react-pdf/renderer), vista /cotizador/[id].
+- El commit 948c7bb "fix: enforce quote margin override authorization"
+  ya contiene 073/074 + tests + CHECKSUMS: la deuda QA-074-GIT-001
+  ("073/074 sin commit") quedó resuelta en el worktree.
+- Validaciones documentadas como verdes: suite SQL completa,
+  npm test, npm run build (fuera de sandbox), audit_change 0 errores
+  (1 warning histórico 060/search_path, falso positivo de la herramienta).
+
+----------------------------------------------------------------
+2. HALLAZGOS CONSOLIDADOS (coordinación auditoría técnica + QA)
+----------------------------------------------------------------
+CERRADO (verificado en vivo por revisión final previa):
+- C-1  RLS cotizacion_componente filtrado directo a COMERCIAL/LECTURA
+       → migración 067. Cerrado y verificado.
+- I-2  Idempotencia TRANSPORTE/PREPARACIONES leía valor post-margen
+       → migración 068. Cerrado y verificado con margen 20%.
+- H-073-001 margen_override_pct inyectable por COMERCIAL vía URL/FormData
+       → migraciones 073/074. Cerrado en worktree (commit 948c7bb).
+
+ABIERTO:
+- I-3 (IMPORTANT, no bloqueante): botón PDF habilitado para cotizaciones
+  sin componentes (flujo simple previo → PDF con 0 líneas) y
+  cotizacion.fecha_emision nullable → new Date(null) = 1969/1970.
+  Fix mínimo ya documentado. Archivos:
+    web/src/app/cotizador/[id]/pdf/route.ts
+    web/src/app/cotizador/[id]/page.tsx
+    web/src/app/cotizador/[id]/pdf/documento.tsx
+- ABIERTO: reauditoría QA del commit 948c7bb (073/074 ya commiteados).
+- ABIERTO: prueba UI/PDF E2E autenticada contra STAGING (requiere
+  credenciales y autorización explícita del usuario).
+- ABIERTO (decisión del usuario): mecanismo de integración del worktree
+  hacia master (merge/rebase/cherry-pick + orden de pasos).
+- ABIERTO: test unitario JS del filtro de inventario/sobrante pack
+  y mejora del CSS de desglose (deuda menor no bloqueante).
+
+DEUDA REGISTRADA (no bloqueante, del ledger previo):
+- M-1: audit_change.py falso positivo 060/search_path (tooling).
+- M-6: preview via margen_override en URL para COMERCIAL diverge al emitir
+  (MARGIN_BELOW_MINIMUM); UI no puede avisar porque minimum_pct enmascarado.
+- M-7: estado del formulario se pierde ante error de emisión.
+
+----------------------------------------------------------------
+3. PLAN DE AJUSTE PRIORIZADO PROPUESTO
+----------------------------------------------------------------
+El implementador de este plan debe trabajar DENTRO del worktree
+cotizador-calculado (rama aislada), nunca en master.
+
+P0 (seguridad/datos) — NINGUNO abierto en esta auditoría.
+P1 (funcionales):
+  Ajuste 1: cerrar I-3 (PDF para cotizaciones sin componentes +
+            fecha_emision NULL). Bajo riesgo, alcance acotado a
+            web/src/app/cotizador/[id]/{page.tsx, pdf/route.ts,
+            pdf/documento.tsx}. Test: evitar PDF vacío y fecha 1970.
+  Ajuste 2: reauditoría QA del commit 948c7bb (073/074) por rol
+            QA externo y anexar resultado a esta bitácora.
+P2 (integración):
+  Ajuste 3: decidir y ejecutar mecanismo de integración worktree→master
+            con pasos verificables (requiere autorización del usuario).
+  Ajuste 4: prueba UI/PDF E2E autenticada contra STAGING
+            (requiere web/.env.local con credenciales; autorización).
+P3 (deuda):
+  Ajuste 5: M-6 (bloquear margen_override en URL para COMERCIAL o
+            propagar minimum_pct enmascarado), M-7 (preservar estado
+            del formulario), M-1 (fix tooling).
+
+----------------------------------------------------------------
+4. DÓNDE QUEDÓ ESTA SESIÓN
+----------------------------------------------------------------
+- Auditoría inicial completa y consolidada (reporte en este anexo).
+- Sin cambios de código. Siguiente acción = autorización del usuario
+  para el Ajuste 1 (P1) dentro del worktree.
+- Memoria: este anexo (fuente primaria). Ledger SDD del worktree se
+  actualizará cuando se ejecute el primer ajuste.
+================================================================
+ANEXO CLINE — 2026-08-28 — AJUSTE 1 EJECUTADO (I-3 PDF) — COMMIT 0a35d80
+================================================================
+
+Autorización del usuario: "Autorizar Ajuste 1 completo: cerrar I-3
+(PDF sin componentes + fecha_emision NULL) + test + commit en el worktree".
+
+Qué se cambió (worktree cotizador-calculado, rama worktree-cotizador-calculado):
+- web/src/app/cotizador/[id]/pdf/route.ts: si no hay componentes válidos
+  (cotizaciones del flujo simple anterior, TARIFA_PUBLICADA) responde 409
+  "PDF no disponible..." en vez de generar un PDF con tabla vacía. Además
+  protege fecha_emision NULL usando el helper formatoFechaPdf (antes:
+  new Date(null) → 1-ene-1970).
+- web/src/app/cotizador/[id]/page.tsx: el botón "Generar PDF" queda
+  deshabilitado con title explicativo cuando no hay componentes; se reutilizó
+  filasValidas en la tabla (se eliminó un .filter duplicado).
+- web/src/app/cotizador/[id]/pdf/documento.tsx: defensa en profundidad —
+  si recibe 0 componentes muestra la línea "Sin desglose persistido; ver total."
+- web/src/app/cotizador/[id]/pdf/formato.ts (NUEVO): helper formatoFechaPdf,
+  agnóstico de zona horaria.
+- web/scripts/test-pdf-fecha.mjs (NUEVO): cubre NULL, undefined, vacío,
+  inválida, válida y epoch.
+- web/package.json: npm test ahora incluye test-pdf-fecha.mjs.
+
+Evidencia ejecutada (no inferida):
+- npm test: OK (3 scripts).
+- npx next build (NEXT_DIST_DIR=.next-verificacion): "Compiled successfully",
+  typecheck OK, 3/3 páginas estáticas, ruta /cotizador/[id]/pdf presente.
+- Commit 0a35d80 "fix(pdf): bloquear PDF para cotizaciones sin componentes
+  y proteger fecha_emision NULL (I-3)" — 6 archivos, +101/-29.
+- git status limpio en el worktree tras el commit.
+- Ledger SDD del worktree actualizado (progress.md).
+
+Pendientes (sin cambio de estado respecto a lo anterior, solo I-3 cerrado):
+- Reauditoría QA de 073-074 + commit 0a35d80.
+- Prueba manual UI/PDF E2E contra STAGING (requiere web/.env.local).
+- Decisión del usuario sobre integración worktree → master.
+- No se hizo push, merge, deploy ni escritura en STAGING/PROD.
+================================================================
+ANEXO CLINE — 2026-08-28 — REAUDITORÍA QA DE 073/074 + 0a35d80
+================================================================
+
+Como Coordinador QA, ejecuté la reauditoría pendiente con evidencia real
+contra el Postgres local `estampados_test` (lectura/no destructiva; los
+tests SQL corren en transacción con ROLLBACK final).
+
+Evidencia ejecutada:
+- Suite SQL completa (`scripts/run_db_tests.ps1`), 26 archivos:
+  "Tests de base de datos completados." — todos los asserts PASSED.
+  Incluye las regresiones clave del pivote proveedor-first:
+    * test_quote_calculada.sql: COMERCIAL crea cotización sin costo/margen;
+      COMERCIAL no puede inyectar margen manual en emisión (073);
+      NO_COMPONENTS; ADMIN puede cotizar bajo margen mínimo; idempotencia
+      con payload distinto → CONFLICT.
+    * test_quote_calculada_preview.sql: preview enmascarada por rol.
+    * test_quote_supplier_first.sql: proveedor-first; altas manuales en
+      PENDING_REVIEW; LECTURA no crea datos manuales.
+    * test_transporte_idempotency_non_passthrough.sql: reintento idéntico
+      con TRANSPORTE markup 20% → OK (no CONFLICT); payload distinto →
+      CONFLICT (regresión del fix I-2/068).
+    * test_tecnicas_disponibles.sql: solo técnicas curadas con precio no nulo.
+- Tests Python del motor de precios: Ran 31 tests, OK.
+- Observación (no bloqueante): psql en Windows necesita
+  $env:PGCLIENTENCODING='UTF8' para la suite; sin eso falla
+  test_data_sanitization.sql con error WIN1252→UTF8. Problema de entorno,
+  no de código. Documentar en README o en el script si se desea.
+
+Estado tras la reauditoría:
+- No hay bloqueantes de seguridad funcionales abiertos en 073/074 ni en
+  el commit 0a35d80 (I-3 PDF).
+- Veredicto de QA del worktree: PASS con observaciones menores de
+  entorno (encodings) y de proceso (falta E2E real de navegador/PDF).
+- Pendientes operativos sin cambio: prueba E2E autenticada contra STAGING
+  y decisión del usuario sobre integración worktree → master.
+================================================================
+ANEXO CLINE — 2026-08-28 — PLAN DE INTEGRACIÓN WORKTREE → MASTER
+================================================================
+
+Se creó el plan de integración (decisión/documentación, sin ejecución):
+  .claude/worktrees/cotizador-calculado/docs/superpowers/plans/
+  2026-08-28-integracion-worktree-master.md
+
+Evidencia topológica recogida:
+- master = 2a42687; worktree = 0a35d80 (18 commits adelante, sin divergencia,
+  fast-forward posible: merge-base == master HEAD).
+- staging = e845af1, 18 commits detrás de master (habrá que sincronizarla
+  para que CI/CD despliegue 060-074).
+- web/.env.local no está en git (sin fuga de credenciales).
+
+Recomendación del plan: Opción A — merge --ff-only worktree → master,
+sync staging → master, push a origin (requiere autorización), y CI
+aplica 060-074 en STAGING. Incluye checklist pre-merge, pasos, rollback
+(snapshot de STAGING; migraciones forward-only) y post-deploy validation.
+Queda pendiente la autorización explícita del usuario para:
+  1) push/merge/sync (Opción A),
+  2) prueba E2E contra STAGING,
+  3) decidir destino del flujo viejo 060-068 (conservar/ocultar/retirar).
+No se ejecutó ningún paso de git mutante ni escritura en STAGING/PROD.
+================================================================
+ANEXO CLINE — 2026-08-28 — INTEGRACIÓN EJECUTADA (OPCIÓN A) + CI/DEPLOY
+================================================================
+
+Autorización del usuario: "Autorizar Opción A completa: merge ff-only en
+master + sync staging + push a origin (ejecutar y verificar CI)".
+
+Pasos ejecutados (todos con verificación entre paso y paso):
+1. Merge --ff-only worktree-cotizador-calculado → master:
+   2a42687..0a35d80 (35 archivos, +6696/-163). Exit 0.
+2. Sync staging → master (ff-only): e845af1..0a35d80. Exit 0.
+3. Push a origin: "2a42687..0a35d80 master -> master" y
+   "e845af1..0a35d80 staging -> staging". PUSH_EXIT=0.
+4. git ls-remote origin: master y staging = 0a35d80. Confirmado.
+
+Resultados GitHub Actions (via API, verificados):
+- CI #94 (master, commit 0a35d80): COMPLETED / SUCCESS.
+- Deploy Staging #29 (staging, commit 0a35d80): COMPLETED / SUCCESS
+  → migraciones 000-074 aplicadas en Supabase STAGING por CI/CD.
+
+Estado Git final:
+- master local = 0a35d80; staging local = 0a35d80; origin ambos = 0a35d80.
+- El trabajo del cotizador proveedor-first (060-074 + I-3 PDF) ya está en
+  la rama desplegable y desplegado en STAGING.
+
+Pendientes (no bloqueantes):
+- Prueba E2E manual/automatizada en navegador contra STAGING (§8 del plan
+  de integración): crear cotización ADMIN/COMERCIAL, preview, PDF, 409 en
+  cotizaciones viejas. Requiere web/.env.local y es la única validación que
+  nunca se hizo end-to-end.
+- Decidir destino del flujo viejo 060-068 (conservar/ocultar/retirar).
+- El archivo del plan de integración quedó como draft sin commitear en el
+  worktree (docs/superpowers/plans/2026-08-28-integracion-worktree-master.md);
+  se puede versionar y cerrar en un ciclo posterior si se desea.
+
+================================================================================
+ANEXO 2026-08-28 (Cline, Coordinador) — QA E2E EJECUTADO CONTRA STAGING
+================================================================================
+QUE SE HIZO: servicio levantado localmente (next dev :3000, env STAGING), login
+real COMERCIAL (qa-***@prueba) con @supabase/ssr, y flujo proveedor-first
+de punta a punta con navegador Edge headless (CDP) + curl.
+
+EVIDENCIA EJECUTADA (PASS):
+- Gate de sesion: / y /cotizador sin cookie -> 307 /login. Con cookie -> 200.
+- Preview proveedor-first (org FONDO DE EMPLEADOS 9, Agenda E, cant 10):
+  HTTP 200, Total calculado $65.800.
+- EMITIR via navegador real -> redirect 303 -> /cotizador/145; DB verificada:
+  cotizacion 145 EMITIDA/CALCULO_COMPONENTES/COMERCIAL, componente PRODUCTO
+  (10 x 4600, margen 30, source PRECIO_PROVEEDOR_SNAPSHOT), evento CREADA.
+- Calculo validado con referencia independiente: 46000/(1-0.30)=65714.29 ->
+  redondeo UP_100 (politica MVP_DEFAULT/UP_100 vigente) = 65.800. COINCIDE.
+- PDF cotizacion 145 -> HTTP 200, header %PDF-1.3 (fix I-3 vivo).
+- PDF cotizacion 104 (flujo viejo sin componentes) -> HTTP 409 con mensaje
+  'PDF no disponible: ...' (bloqueo I-3 operativo).
+- Suite SQL 26 archivos PASS (sesion previa); no se repitio.
+
+BLOCKED (limitacion del harness, NO de la app):
+- Invocar Server Actions via curl falla con 'Server Reference ID did not match
+  the expected format' (Next exige el protocolo del navegador). Idempotencia y
+  reglas de margen quedaron cubiertas por: navegador real (unico envio) y
+  suite SQL (test_quote_calculada / test_transporte_idempotency / 073).
+
+DEFECTOS DE ENTORNO RESUELTOS (no eran de codigo):
+- web/ sin npm install tras la integracion (PDF 500 por @react-pdf/renderer
+  ausente). Resuelto con npm install + reinicio del dev server.
+
+OBSERVACIONES (no bloqueantes):
+- P3/perf: GET / y /cotizador tardan 6-51s en dev (queries WAN seriales +
+  compilacion). Revisar paralelizacion de queries en page.tsx.
+- Datos STAGING: precio_proveedor_snapshot vigentes = 0 (vigencia vencida);
+  el preview usa el snapshot por id explicito. Validar si la busqueda UI
+  deberia excluir vigencias vencidas.
+- Confirmado: input margen_override_pct editable SOLO ADMIN (073); hidden de
+  estado para COMERCIAL (page.tsx:711) es correcto.
+
+CONECTADO: no. Artefactos QA eliminados; harness versionado en web/scripts/
+qa-login.mjs y qa-browser.mjs; .gitignore con patrones QA. STAGING intacto
+(solo datos de prueba cotizacion 145 y cuenta qa-***@prueba).
+
+=== ANEXO 2026-08-28 (Cline) - RERUN QA COMPLETO + FIX PERF COTIZADOR ===
+FIX APLICADO (commit local, sin push): web/src/app/cotizador/page.tsx - las 4
+consultas derivadas del render (productos/ofertas/tecnicas/preview) ahora se
+resuelven en Promise.all (antes: 4 round-trips seriales hacia Supabase).
+Hallazgo vigencia: FALSO POSITIVO - los 934 snapshots tienen precio_vigencia=NULL
+y fn_consola_ofertas_producto_proveedor lo trata como vigente indefinido
+(IS NULL OR @> p_at). No es bug. INFO: la busqueda de productos toma el ultimo
+snapshot sin mirar vigencia (aceptable hoy).
+Hallazgo perf: los 51s de GET / eran ruido de npm install (CPU saturada).
+Mediciones reales: raiz ~1.0-1.3s, cotizador base ~1.1-1.8s, preview completo
+3.2s -> ~1.6-1.8s (-45%).
+RE-TEST EJECUTADO (Edge real + DB): build/typecheck OK; npm test OK; login
+COMERCIAL OK; preview $65.800 OK; doble-click adversarial en Emitir -> UNA sola
+cotizacion #146 (DB: key ce54635f-407b-4861-aab5-0164ffb7dac8 = 1 fila, 1 evento
+CREADA) PASS; #146 integra (PRODUCTO 10x4600, margen 30, total 65800, source
+PRECIO_PROVEEDOR_SNAPSHOT) PASS; PDF #146 = 200 application/pdf y PDF #104 = 409
+(fix I-3 vivo) PASS; enmascaramiento COMERCIAL sin costo/margen en detalle PASS
+y NO ve input editable de margen (selector refinado) PASS; override margen 25%
+via URL con COMERCIAL: preview sin total y sin emision (073 bloquea desde
+preview, 0 filas creadas) PASS.
+Harness: web/scripts/qa-browser.mjs v2 (doble-click, override negativo, modo
+QA_PROBE_ONLY=1 sin emision; fix regex). tsconfig auto-tweak de build revertido.
+Pendiente usuario: push de los commits locales (8dba827 + este), decision del
+flujo viejo 060-068. Servicio dev sigue arriba en http://localhost:3000 (STAGING).
+
+=== ANEXO 2026-08-29 (Codex) - REVISION QA + COTIZADOR UI ===
+Solicitud: preguntar diagnostico al ingeniero IA QA, corregir punto a punto y
+reenviar solo al ingeniero cuando quede listo.
+
+Estado observado:
+- Checkout raiz en master con 2 commits locales por delante de origin/master:
+  8dba827 y f3493c0.
+- origin/master y origin/staging ya incluyen el trabajo hasta 0a35d80; el
+  worktree cotizador-calculado tiene commit limpio 948c7bb, ya revalidado por
+  auditores sin bloqueantes de 073/074.
+- Cambios locales no commiteados detectados en:
+  web/src/app/cotizador/page.tsx
+  web/src/app/cotizador/acciones.ts
+  web/src/componentes/select-auto-submit.tsx
+- Artefactos locales no integrados:
+  .claude/worktrees/cotizador-calculado/
+  web/scripts/qa-frontend.mjs
+
+Correccion/revision aplicada:
+- Se valido que SelectAutoSubmit es requerido por page.tsx; debe entrar en el
+  commit atomico junto con page.tsx y acciones.ts.
+- Se dejo fuera de commit por ahora web/scripts/qa-frontend.mjs: no esta
+  referenciado por package.json/docs y duplica el harness ya versionado
+  web/scripts/qa-browser.mjs. Mantener como artefacto local salvo decision
+  explicita.
+- Los cambios UI eliminan bloqueos HTML5 por campos required ocultos en details,
+  agregan validacion server-side en altas manuales de producto/tecnica y hacen
+  auto-submit al seleccionar proveedor/producto/oferta/tecnica.
+
+Validaciones ejecutadas:
+- python -m unittest discover -s tests: OK, 31 tests.
+- python scripts/audit_change.py --all: OK, 0 errores, 1 warning historico en
+  060_extract_quote_calculation_core.sql.
+- npm test en web: OK.
+- npm run build en web: OK.
+- scripts/run_db_tests.ps1 con psql16 y estampados_test: OK, suite SQL completa.
+- git diff --check: OK.
+
+Pendiente inmediato:
+- Crear commit atomico local con page.tsx, acciones.ts y
+  web/src/componentes/select-auto-submit.tsx.
+- No hacer push/deploy/STAGING/PROD hasta autorizacion expresa.
+- Enviar al ingeniero IA QA para revalidacion despues del commit.

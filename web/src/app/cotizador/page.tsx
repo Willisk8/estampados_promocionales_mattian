@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
 import { SinAcceso } from "@/componentes/sin-acceso";
+import SelectAutoSubmit from "@/componentes/select-auto-submit";
 import {
   crearProductoProveedorManual,
   crearCotizacionProveedor,
@@ -277,7 +278,7 @@ export default async function PaginaCotizador({
         </div>
       )}
 
-      <form action={previsualizarCotizacionProveedor}>
+      <form action={previsualizarCotizacionProveedor} noValidate>
         <h2>1. Cliente y proveedor</h2>
         <div className="tarjeta">
           <div className="filtros">
@@ -290,13 +291,13 @@ export default async function PaginaCotizador({
                 </option>
               ))}
             </select>
-            <input
-              name="q_proveedor"
-              placeholder="Buscar proveedor"
-              defaultValue={sp.q_proveedor ?? ""}
+            <SelectAutoSubmit
+              name="id_proveedor"
+              defaultValue={sp.id_proveedor ?? ""}
               disabled={!puedeCotizar}
-            />
-            <select name="id_proveedor" defaultValue={sp.id_proveedor ?? ""} disabled={!puedeCotizar}>
+              ariaLabel="Proveedor"
+              action={prepararCotizacionProveedor}
+            >
               <option value="">Proveedor</option>
               {proveedores.map((p) => (
                 <option key={p.id_proveedor} value={p.id_proveedor}>
@@ -305,26 +306,19 @@ export default async function PaginaCotizador({
                   {` (${p.productos})`}
                 </option>
               ))}
-            </select>
-            <button formAction={prepararCotizacionProveedor} type="submit" disabled={!puedeCotizar}>
-              Buscar proveedor
-            </button>
+            </SelectAutoSubmit>
           </div>
         </div>
 
         <h2>2. Producto del proveedor</h2>
         <div className="tarjeta">
           <div className="filtros">
-            <input
-              name="q_producto"
-              placeholder="Buscar: mug, termo, agenda, esfero..."
-              defaultValue={sp.q_producto ?? ""}
-              disabled={!puedeCotizar || !sp.id_proveedor}
-            />
-            <select
+            <SelectAutoSubmit
               name="id_producto_proveedor"
               defaultValue={sp.id_producto_proveedor ?? ""}
               disabled={!puedeCotizar || productosProveedor.length === 0}
+              ariaLabel="Producto del proveedor"
+              action={prepararCotizacionProveedor}
             >
               <option value="">Producto del proveedor</option>
               {productosProveedor.map((p) => (
@@ -334,19 +328,33 @@ export default async function PaginaCotizador({
                   {p.ultimo_precio ? ` (${cop(p.ultimo_precio)})` : ""}
                 </option>
               ))}
-            </select>
+            </SelectAutoSubmit>
+            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+              <input
+                name="q_producto"
+                placeholder="Filtrar..."
+                defaultValue={sp.q_producto ?? ""}
+                disabled={!puedeCotizar || !sp.id_proveedor}
+                style={{ flex: 1 }}
+              />
+              <button
+                formAction={prepararCotizacionProveedor}
+                type="submit"
+                formNoValidate
+                disabled={!puedeCotizar || !sp.id_proveedor}
+                title="Filtrar productos del proveedor"
+              >
+                Filtrar
+              </button>
+            </div>
             <input
               name="cantidad"
               type="number"
               min="1"
               placeholder="Cantidad"
               defaultValue={sp.cantidad ?? ""}
-              required
               disabled={!puedeCotizar}
             />
-            <button formAction={prepararCotizacionProveedor} type="submit" disabled={!puedeCotizar || !sp.id_proveedor}>
-              Buscar producto/ofertas
-            </button>
           </div>
 
           {productoSeleccionado && (
@@ -372,7 +380,6 @@ export default async function PaginaCotizador({
               <input
                 name="manual_nombre_producto"
                 placeholder="Producto: mug 11 oz, tula, agenda..."
-                required
                 disabled={!puedeCotizar}
               />
               <input name="manual_sku_proveedor" placeholder="SKU proveedor opcional" disabled={!puedeCotizar} />
@@ -383,7 +390,6 @@ export default async function PaginaCotizador({
                 min="1"
                 step="0.01"
                 placeholder="Costo proveedor"
-                required
                 disabled={!puedeCotizar}
               />
               <select name="manual_moneda" defaultValue="COP" disabled={!puedeCotizar}>
@@ -438,11 +444,12 @@ export default async function PaginaCotizador({
         <h2>3. Costo proveedor y tecnica</h2>
         <div className="tarjeta">
           <div className="filtros">
-            <select
+            <SelectAutoSubmit
               name="id_precio_proveedor_snapshot"
               defaultValue={sp.id_precio_proveedor_snapshot ?? ""}
               disabled={!puedeCotizar || ofertas.length === 0}
-              required
+              ariaLabel="Oferta / costo proveedor"
+              action={previsualizarCotizacionProveedor}
             >
               <option value="">Oferta / costo proveedor</option>
               {ofertas.map((o) => (
@@ -453,17 +460,20 @@ export default async function PaginaCotizador({
                   {o.vigente ? "" : " (no vigente)"}
                 </option>
               ))}
-            </select>
+            </SelectAutoSubmit>
             <input
               name="q_tecnica"
-              placeholder="Buscar tecnica: DTF, sublimacion, laser..."
+              placeholder="Filtrar técnicas..."
               defaultValue={sp.q_tecnica ?? ""}
               disabled={!puedeCotizar || !sp.cantidad}
+              style={{ flex: 1 }}
             />
-            <select
+            <SelectAutoSubmit
               name="id_snapshot_tecnica"
               defaultValue={sp.id_snapshot_tecnica ?? ""}
               disabled={!puedeCotizar || tecnicas.length === 0}
+              ariaLabel="Tecnica de marcacion"
+              action={previsualizarCotizacionProveedor}
             >
               <option value="">Sin tecnica de marcacion</option>
               {tecnicas.map((t) => (
@@ -472,10 +482,7 @@ export default async function PaginaCotizador({
                   {t.size_label ? ` - ${t.size_label}` : ""}
                 </option>
               ))}
-            </select>
-            <button formAction={prepararCotizacionProveedor} type="submit" disabled={!puedeCotizar || !sp.cantidad}>
-              Buscar tecnicas
-            </button>
+            </SelectAutoSubmit>
           </div>
 
           {ofertaSeleccionada && (
@@ -549,13 +556,11 @@ export default async function PaginaCotizador({
               <input
                 name="manual_nombre_proveedor_tecnica"
                 placeholder="Proveedor tecnica: Surtivinilos, taller..."
-                required
                 disabled={!puedeCotizar}
               />
               <input
                 name="manual_codigo_tecnica"
                 placeholder="Tecnica: DTF, SUBLIMACION, LASER..."
-                required
                 disabled={!puedeCotizar}
               />
               <input
@@ -564,7 +569,6 @@ export default async function PaginaCotizador({
                 min="1"
                 step="0.01"
                 placeholder="Costo tecnica"
-                required
                 disabled={!puedeCotizar}
               />
               <select name="manual_moneda_tecnica" defaultValue="COP" disabled={!puedeCotizar}>
@@ -704,7 +708,7 @@ export default async function PaginaCotizador({
               Total calculado: <strong>{cop(previewTotal)}</strong>. El PDF no mostrara costos ni margen.
             </div>
 
-            <form action={crearCotizacionProveedor} className="filtros">
+            <form action={crearCotizacionProveedor} className="filtros" noValidate>
               <input type="hidden" name="idempotency_key" value={idempotencyKey} />
               <input type="hidden" name="id_organizacion" value={sp.id_organizacion ?? ""} />
               <input type="hidden" name="id_proveedor" value={sp.id_proveedor ?? ""} />

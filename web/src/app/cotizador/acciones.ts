@@ -269,14 +269,23 @@ export async function crearProductoProveedorManual(formData: FormData) {
   conservarEstadoProveedor(formData, params);
   params.set("modo", "proveedor");
 
+  // Validacion server-side: el HTML5 required de estos campos se retiro porque
+  // viven en <details> ocultos y bloqueaban submits de otros pasos.
+  const nombreProducto = leerTexto(formData, "manual_nombre_producto");
+  const precioManual = leerNumero(formData, "manual_precio");
+  if (!nombreProducto || precioManual === null) {
+    params.set("error", "Producto manual incompleto: se requieren nombre del producto y precio.");
+    redirect(`/cotizador?${params.toString()}`);
+  }
+
   const supabase = await crearClienteServidor();
   const { data, error } = await supabase.rpc("fn_consola_crear_producto_proveedor_manual", {
     p_id_proveedor: leerTexto(formData, "id_proveedor"),
     p_nombre_proveedor: leerTexto(formData, "manual_nombre_proveedor"),
-    p_nombre_producto: leerTexto(formData, "manual_nombre_producto"),
+    p_nombre_producto: nombreProducto,
     p_sku_proveedor: leerTexto(formData, "manual_sku_proveedor"),
     p_categoria: leerTexto(formData, "manual_categoria"),
-    p_precio: leerNumero(formData, "manual_precio"),
+    p_precio: precioManual,
     p_moneda: leerTexto(formData, "manual_moneda") ?? "COP",
     p_unidad_compra: leerTexto(formData, "manual_unidad_compra") ?? "UNIT",
     p_cantidad_pack: leerNumero(formData, "manual_cantidad_pack"),
@@ -321,12 +330,21 @@ export async function crearSnapshotTecnicaManual(formData: FormData) {
   conservarEstadoProveedor(formData, params);
   params.set("modo", "proveedor");
 
+  // Validacion server-side (mismo motivo que producto manual).
+  const nombreProveedorTecnica = leerTexto(formData, "manual_nombre_proveedor_tecnica");
+  const codigoTecnica = leerTexto(formData, "manual_codigo_tecnica");
+  const precioTecnica = leerNumero(formData, "manual_precio_tecnica");
+  if (!nombreProveedorTecnica || !codigoTecnica || precioTecnica === null) {
+    params.set("error", "Tecnica manual incompleta: se requieren proveedor de tecnica, codigo y precio.");
+    redirect(`/cotizador?${params.toString()}`);
+  }
+
   const supabase = await crearClienteServidor();
   const { data, error } = await supabase.rpc("fn_consola_crear_snapshot_tecnica_manual", {
     p_id_proveedor_tecnica: leerTexto(formData, "manual_id_proveedor_tecnica"),
-    p_nombre_proveedor_tecnica: leerTexto(formData, "manual_nombre_proveedor_tecnica"),
-    p_codigo_tecnica: leerTexto(formData, "manual_codigo_tecnica"),
-    p_precio: leerNumero(formData, "manual_precio_tecnica"),
+    p_nombre_proveedor_tecnica: nombreProveedorTecnica,
+    p_codigo_tecnica: codigoTecnica,
+    p_precio: precioTecnica,
     p_moneda: leerTexto(formData, "manual_moneda_tecnica") ?? "COP",
     p_billing_unit: leerTexto(formData, "manual_billing_unit") ?? "unidad",
     p_width_cm: leerNumero(formData, "manual_width_cm"),
