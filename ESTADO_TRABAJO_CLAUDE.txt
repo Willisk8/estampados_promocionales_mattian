@@ -1030,3 +1030,29 @@ Pendiente inmediato:
   web/src/componentes/select-auto-submit.tsx.
 - No hacer push/deploy/STAGING/PROD hasta autorizacion expresa.
 - Enviar al ingeniero IA QA para revalidacion despues del commit.
+
+=== ANEXO 2026-08-29 (Codex) - LOGIN DEV LOCAL 127.0.0.1 ===
+Sintoma usuario: la pagina /login ya carga, pero al intentar entrar desde
+http://127.0.0.1:3000/login no avanza; terminal muestra GET /login 200 y warning
+de Next.js por cross origin request desde 127.0.0.1.
+
+Diagnostico:
+- Next dev estaba vivo y respondiendo: / y /login devuelven HTTP 200.
+- Assets _next principales devuelven HTTP 200.
+- El HTML del login contiene form POST correcto.
+- La terminal no mostro POST /login en la captura, por lo que primero se debe
+  verificar clic en boton Entrar y/o usar localhost.
+
+Cambio aplicado:
+- web/next.config.ts agrega allowedDevOrigins para 127.0.0.1 y 192.168.1.5,
+  evitando warnings/bloqueos de recursos dev al entrar por esas direcciones.
+
+Validaciones:
+- npm test en web: OK.
+- npm run build en web: OK.
+
+Instruccion operativa:
+- Reiniciar npm run dev para que Next lea next.config.ts.
+- Probar primero http://localhost:3000/login.
+- Si usa http://127.0.0.1:3000/login, tambien deberia quedar permitido tras el
+  reinicio.
