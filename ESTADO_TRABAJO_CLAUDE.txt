@@ -1112,3 +1112,38 @@ Pendiente:
 - Reiniciar npm run dev y probar nuevamente /login -> /.
 - Si el login POST sigue tardando >20s, el cuello restante esta en Supabase Auth
   remoto/red y conviene probar credenciales/region/conectividad aparte.
+
+=== ANEXO 2026-08-29 (Codex) - FIX REFRESH TOKEN + LOGIN PEGADO ===
+Sintoma usuario: http://localhost:3000 tarda mucho; 127.0.0.1/login carga rapido
+pero queda pegado en login. Terminal muestra AuthApiError:
+refresh_token_already_used.
+
+Diagnostico reproducido:
+- HAR localhost/127 muestra login inicial y assets rapidos.
+- Terminal muestra POST /login y luego errores refresh_token_already_used.
+- Navegador integrado abrio /login y mostro simultaneamente menu lateral con
+  usuario ADMIN, indicando que la sesion ya existia pero la pagina login no
+  redirigia.
+- Tras corregir, navegador integrado abrio
+  /login?siguiente=%2Fcotizador y termino en /cotizador en ~4.8s con datos del
+  cotizador proveedor-first visibles.
+
+Cambio aplicado:
+- web/src/middleware.ts usa supabase.auth.getClaims() en rutas privadas en vez
+  de getUser(); mantiene validacion de JWT sin pedir siempre el usuario al
+  servidor Auth.
+- web/src/lib/supabase/servidor.ts usa getClaims() para identificar el subject
+  del JWT y luego consulta perfil_usuario bajo RLS.
+- web/src/app/login/page.tsx redirige automaticamente a siguienteSeguro si ya
+  existe sesion de consola. Asi no queda pegado en login cuando ya esta logueado.
+
+Validaciones:
+- npm test en web: OK.
+- npm run verificar en web: OK.
+- Navegacion browser integrada: /login?siguiente=%2Fcotizador -> /cotizador OK;
+  log del servidor: 307 en ~654ms y /cotizador 200 en ~2.4s.
+
+Observacion:
+- El cotizador ya carga, pero el select de clientes expone muchas opciones y el
+  flujo sigue dependiendo de Supabase STAGING remoto; optimizacion futura:
+  buscador/paginacion de clientes y skeletons por seccion.

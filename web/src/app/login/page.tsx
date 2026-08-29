@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { crearClienteServidor } from "@/lib/supabase/servidor";
+import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
 import { rutaInternaSegura } from "@/lib/rutas-internas";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +10,9 @@ export default async function PaginaLogin({
   searchParams: Promise<{ error?: string; siguiente?: string }>;
 }) {
   const params = await searchParams;
+  const siguienteSeguro = rutaInternaSegura(params.siguiente, "/");
+  const sesion = await obtenerSesionConsola();
+  if (sesion) redirect(siguienteSeguro);
 
   async function iniciarSesion(formData: FormData) {
     "use server";
@@ -42,7 +45,7 @@ export default async function PaginaLogin({
       )}
 
       <form action={iniciarSesion}>
-        <input type="hidden" name="siguiente" value={rutaInternaSegura(params.siguiente, "/")} />
+        <input type="hidden" name="siguiente" value={siguienteSeguro} />
         <input
           type="email"
           name="email"

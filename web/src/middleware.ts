@@ -40,12 +40,9 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  // getUser revalida el token contra Supabase; getSession solo lee la cookie.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data, error } = await supabase.auth.getClaims();
 
-  if (!user) {
+  if (error || !data?.claims?.sub) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("siguiente", ruta);

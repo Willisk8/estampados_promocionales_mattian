@@ -51,15 +51,14 @@ export type SesionConsola = {
 export const obtenerSesionConsola = cache(async (): Promise<SesionConsola | null> => {
   const supabase = await crearClienteServidor();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
+  if (claimsError || !userId) return null;
 
   const { data } = await supabase
     .from("perfil_usuario")
     .select("email, rol, activo")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (!data || !data.activo) return null;
