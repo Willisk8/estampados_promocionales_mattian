@@ -31,20 +31,53 @@ function Tarjeta({ cifra, etiqueta }: { cifra: number | string; etiqueta: string
   );
 }
 
+async function leerResumenConTimeout(
+  supabase: Awaited<ReturnType<typeof crearClienteServidor>>,
+  timeoutMs = 5000,
+): Promise<{ data: Resumen | null; error: string | null }> {
+  const controlador = new AbortController();
+  const timeout = setTimeout(() => controlador.abort(), timeoutMs);
+
+  try {
+    const { data, error } = await supabase
+      .rpc("fn_consola_resumen")
+      .abortSignal(controlador.signal);
+    return {
+      data: (data?.[0] ?? null) as Resumen | null,
+      error: error?.message ?? null,
+    };
+  } catch (error) {
+    return {
+      data: null,
+      error:
+        error instanceof Error && error.name === "AbortError"
+          ? "La consulta de resumen tardó demasiado. La consola sigue disponible desde el menú."
+          : error instanceof Error
+            ? error.message
+            : "Error desconocido leyendo el resumen.",
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export default async function PaginaResumen() {
   const sesion = await obtenerSesionConsola();
   if (!sesion) return <SinAcceso />;
 
   const supabase = await crearClienteServidor();
-  const { data, error } = await supabase.rpc("fn_consola_resumen");
-  const r = (data?.[0] ?? null) as Resumen | null;
+  const { data: r, error } = await leerResumenConTimeout(supabase);
 
   if (error || !r) {
     return (
       <>
         <h1>Resumen</h1>
+        <p className="subtitulo">
+          La sesión está activa. Puedes entrar al Cotizador desde el menú lateral
+          aunque el resumen tarde.
+        </p>
         <div className="aviso-caja">
-          No se pudo leer el resumen: {error?.message ?? "sin datos"}
+          No se pudo leer el resumen: {error ?? "sin datos"}
         </div>
       </>
     );

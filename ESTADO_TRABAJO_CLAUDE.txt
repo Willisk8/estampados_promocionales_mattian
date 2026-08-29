@@ -1085,3 +1085,30 @@ Pendiente de prueba manual:
 - Probar http://localhost:3000/login.
 - Verificar tiempos en terminal: /login deberia bajar claramente; / sigue
   dependiendo de Supabase STAGING remoto y de fn_consola_resumen.
+
+=== ANEXO 2026-08-29 (Codex) - TIMEOUT RESUMEN HOME ===
+Sintoma usuario: despues de login, http://localhost:3000/ tardo muchisimo; log
+Next mostro GET / 200 en ~185s. 127.0.0.1/login carga rapido, pero se queda en
+login mientras la accion/navegacion posterior sigue pendiente.
+
+Diagnostico:
+- HAR 127.0.0.1 muestra /login y assets rapidos; no evidencia lentitud de
+  assets.
+- La demora fuerte esta en la pagina / esperando datos vivos de Supabase
+  STAGING, especialmente fn_consola_resumen.
+
+Cambio aplicado:
+- web/src/app/page.tsx ahora lee fn_consola_resumen con timeout de 5s usando
+  AbortController/abortSignal.
+- Si el resumen tarda demasiado, la sesion queda activa, se muestra aviso y el
+  usuario puede navegar al Cotizador desde el menu lateral sin esperar 2-3
+  minutos por la portada.
+
+Validaciones:
+- npm test en web: OK.
+- npm run build en web: OK.
+
+Pendiente:
+- Reiniciar npm run dev y probar nuevamente /login -> /.
+- Si el login POST sigue tardando >20s, el cuello restante esta en Supabase Auth
+  remoto/red y conviene probar credenciales/region/conectividad aparte.
