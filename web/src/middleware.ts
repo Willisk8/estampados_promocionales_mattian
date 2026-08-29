@@ -10,6 +10,13 @@ const RUTAS_PUBLICAS = ["/login", "/auth"];
  * visitante sin sesion llegue a una pantalla de la consola.
  */
 export async function middleware(request: NextRequest) {
+  const ruta = request.nextUrl.pathname;
+  const esPublica = RUTAS_PUBLICAS.some((p) => ruta.startsWith(p));
+
+  if (esPublica) {
+    return NextResponse.next({ request });
+  }
+
   let respuesta = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -38,20 +45,10 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const ruta = request.nextUrl.pathname;
-  const esPublica = RUTAS_PUBLICAS.some((p) => ruta.startsWith(p));
-
-  if (!user && !esPublica) {
+  if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("siguiente", ruta);
-    return NextResponse.redirect(url);
-  }
-
-  if (user && ruta === "/login") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    url.search = "";
     return NextResponse.redirect(url);
   }
 

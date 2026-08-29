@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 /**
  * Cliente de Supabase para componentes y acciones de servidor.
@@ -47,7 +48,7 @@ export type SesionConsola = {
  * Un usuario autenticado sin fila en perfil_usuario no ve nada: es el diseno,
  * no un fallo. La UI debe distinguir ese caso de una tabla vacia.
  */
-export async function obtenerSesionConsola(): Promise<SesionConsola | null> {
+export const obtenerSesionConsola = cache(async (): Promise<SesionConsola | null> => {
   const supabase = await crearClienteServidor();
 
   const {
@@ -63,4 +64,4 @@ export async function obtenerSesionConsola(): Promise<SesionConsola | null> {
 
   if (!data || !data.activo) return null;
   return { email: data.email, rol: data.rol as RolConsola };
-}
+});

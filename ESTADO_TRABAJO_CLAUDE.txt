@@ -1056,3 +1056,32 @@ Instruccion operativa:
 - Probar primero http://localhost:3000/login.
 - Si usa http://127.0.0.1:3000/login, tambien deberia quedar permitido tras el
   reinicio.
+
+=== ANEXO 2026-08-29 (Codex) - PERF LOGIN/RESUMEN DEV ===
+Sintoma usuario: login y carga inicial extremadamente lentos; logs de Next
+mostraron POST /login entre ~52s y ~116s y GET / entre ~6s y ~19s.
+
+Evidencia:
+- HAR local compartido solo muestra /login inicial y assets en tiempos normales
+  (~129ms para /login, assets 15-396ms). No captura la lentitud posterior al
+  submit.
+- Log de Next confirma que el cuello esta en Server Actions/RSC hablando con
+  Supabase remoto, no en descarga de assets del navegador.
+
+Cambio aplicado:
+- web/src/middleware.ts: las rutas publicas (/login, /auth) ya no ejecutan
+  supabase.auth.getUser() antes de responder. Esto evita llamada remota a
+  Supabase Auth en cada carga de login.
+- web/src/lib/supabase/servidor.ts: obtenerSesionConsola queda envuelta con
+  cache() de React para deduplicar la lectura de sesion/perfil dentro de un
+  mismo render servidor.
+
+Validaciones:
+- npm test en web: OK.
+- npm run build en web: OK.
+
+Pendiente de prueba manual:
+- Reiniciar npm run dev.
+- Probar http://localhost:3000/login.
+- Verificar tiempos en terminal: /login deberia bajar claramente; / sigue
+  dependiendo de Supabase STAGING remoto y de fn_consola_resumen.
