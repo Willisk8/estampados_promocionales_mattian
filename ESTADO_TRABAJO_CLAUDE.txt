@@ -1,3 +1,75 @@
+============================================================
+LEER ESTO PRIMERO — actualización 2026-08-30, sesión b8400185
+============================================================
+
+Este archivo tiene 1149+ líneas acumuladas de varias sesiones/IAs distintas
+trabajando en paralelo. Lo de abajo puede estar desactualizado. Este bloque
+de arriba es el estado real más reciente que verifiqué yo mismo.
+
+**HALLAZGO IMPORTANTE: había DOS copias de código divergentes.**
+- `C:\Users\willi\Documents\Proyectos\Estampados\web` (checkout principal,
+  rama master) — es la que el usuario tiene corriendo en localhost:3000 y
+  la que decidió usar de acá en adelante.
+- `.claude/worktrees/cotizador-calculado` — donde yo hice todo el trabajo
+  de esta sesión (Tasks 1-9, fix de seguridad Critical, etc.). El usuario
+  decidió NO seguir usando este worktree; queda como referencia/histórico,
+  no se descarta pero tampoco es la fuente de verdad de acá en adelante.
+
+**La base de datos NO está en riesgo ni dividida**: ambas copias apuntan al
+mismo Supabase STAGING, y STAGING ya tiene las 74 migraciones aplicadas
+(incluida mi corrección de seguridad Critical de la fuga de costos a
+COMERCIAL/LECTURA, migración 067, y el fix de idempotencia de transporte,
+068). Verificado en vivo contra la API de Supabase, no solo por archivos
+locales.
+
+**El checkout principal (master) ya tiene, sin que yo lo hiciera, un
+commit `ae78bec` ("mejorar flujo proveedor-first") con un componente
+`SelectAutoSubmit` (web/src/componentes/select-auto-submit.tsx) que hace
+auto-submit de los selects del cotizador sin botón extra — resuelve gran
+parte de la queja del usuario sobre tener que hacer clics de más.**
+
+**Verificado con Playwright (cuenta ADMIN de prueba
+qa-e2e-2@estampados-test.example, creada para esto):**
+- El auto-submit SÍ funciona: seleccionar proveedor/producto/oferta
+  efectivamente actualiza la URL y carga los datos siguientes.
+- La sensación de "pantalla en blanco" que reportó el usuario es real pero
+  NO es un crash: cada selección dispara una navegación real (POST server
+  action -> redirect -> fetch RSC) que tarda ~1-3s en dev. No encontré un
+  estado roto/permanente en blanco en ninguna prueba cuidadosa (con espera
+  adecuada, el contenido siempre terminó cargando bien).
+- Agregué `web/src/app/cotizador/loading.tsx` (commit `7f4879d`, ya en
+  master) como mitigación segura y aditiva — no toca lógica ni DB.
+- Hallazgo real de datos (no de código): algunos nombres de organización
+  en el selector tienen comillas dobles y acentos mal codificados (ej.
+  `""GM-BANK CASA DE LAS MONEDAS"" ASOCIACI??N MUTUAL`) — probable problema
+  del pipeline de importación original, no de esta feature. No lo toqué.
+- Pendiente sin verificar: algunos proveedores devuelven 0 productos al
+  seleccionarlos (`fn_consola_buscar_productos_proveedor`) — no confirmé
+  si es un proveedor real sin productos importados (normal) o un bug.
+
+**Decisión explícita del usuario sobre alcance:** el HTML de referencia
+(`cotizador-v2.html`) calcula con fórmulas de física editables por técnica
+(papel+tinta+luz para sublimación, ancho de rollo+merma+área para DTF).
+El usuario preguntó si había que construir eso; mi recomendación (que
+aceptó, delegándome el criterio) fue **NO hacerlo ahora** — es un cambio
+grande que revertiría la decisión ya tomada de "precio por snapshot
+curado", y el usuario pidió explícitamente priorizar que nada se rompa
+sobre agregar alcance nuevo. Queda como fase futura, no iniciada.
+
+**Cuenta de prueba activa:** `qa-e2e-2@estampados-test.example` (ADMIN),
+creada en STAGING para las pruebas de este bloque. Sigue activa al
+escribir esto — revisar si conviene revocarla (mismo patrón que la cuenta
+`qa-e2e@estampados-test.example` de la sesión anterior, ya revocada).
+
+**Para otra sesión/IA que retome esto:** trabajá en el checkout principal
+(`Estampados/web`), no en el worktree, salvo que el usuario diga lo
+contrario. Verificá con Playwright antes de asumir que algo está roto o
+arreglado — varias veces en esta sesión un screenshot tomado demasiado
+pronto pareció mostrar un bug que en realidad era una carrera de tiempos
+del propio test, no un bug real de la app.
+
+============================================================
+
 ESTADO DE TRABAJO — sesión Claude Code (b8400185)
 Última actualización: 2026-08-28 (tarde)
 
