@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
 import { SinAcceso } from "@/componentes/sin-acceso";
+import { CalculadoraCotizador } from "@/componentes/calculadora-cotizador";
 import SelectAutoSubmit from "@/componentes/select-auto-submit";
 import {
   crearProductoProveedorManual,
@@ -253,12 +254,29 @@ export default async function PaginaCotizador({
   const ofertaSeleccionada = ofertas.find((o) => o.id_snapshot === sp.id_precio_proveedor_snapshot);
   const tecnicaSeleccionada = tecnicas.find((t) => t.id_snapshot === sp.id_snapshot_tecnica);
 
+  const flujoEnUso = [
+    "id_organizacion",
+    "id_proveedor",
+    "q_proveedor",
+    "q_producto",
+    "id_producto_proveedor",
+    "id_precio_proveedor_snapshot",
+    "cantidad",
+    "q_tecnica",
+    "id_snapshot_tecnica",
+    "previsualizar_proveedor",
+    "status",
+    "error",
+    "ok",
+  ].some((clave) => Boolean(sp[clave]));
+
   return (
     <>
       <h1>Cotizador</h1>
       <p className="subtitulo">
-        Flujo proveedor-first: cliente, proveedor, producto, costo real, tecnica,
-        preview y cotizacion auditable.
+        Arriba, la calculadora visual: estima el precio en vivo con el costo real del
+        producto del proveedor. Abajo, el flujo proveedor-first que emite la cotizacion
+        auditable y su PDF.
       </p>
 
       {sp.status && (
@@ -277,6 +295,23 @@ export default async function PaginaCotizador({
           Tecnica/costo manual creado en revision. Ya puedes usarlo en esta cotizacion.
         </div>
       )}
+
+      <h2>Calculadora visual (estimacion)</h2>
+      {esAdmin ? (
+        <CalculadoraCotizador proveedoresIniciales={proveedores} esAdmin={esAdmin} />
+      ) : (
+        <div className="aviso-caja neutro">
+          La calculadora visual expone costos, desgaste y margen: solo esta disponible
+          para rol ADMIN. Usa el flujo proveedor-first de abajo.
+        </div>
+      )}
+
+      <details open={flujoEnUso}>
+        <summary>
+          <h2 style={{ display: "inline-block", margin: "18px 0 10px" }}>
+            Flujo proveedor-first (emitir cotizacion real)
+          </h2>
+        </summary>
 
       <form action={previsualizarCotizacionProveedor} noValidate>
         <h2>1. Cliente y proveedor</h2>
@@ -753,6 +788,7 @@ export default async function PaginaCotizador({
           </>
         )}
       </div>
+      </details>
 
       <h2>Ultimas cotizaciones</h2>
       <div className="tabla-contenedor">

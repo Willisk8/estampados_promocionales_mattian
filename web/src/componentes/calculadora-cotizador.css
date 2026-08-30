@@ -1,0 +1,633 @@
+/*
+ * Port fiel del CSS de C:\Users\willi\Downloads\cotizador-v2.html.
+ *
+ * Todo va prefijado con .calcv2 a proposito: el HTML original usaba selectores
+ * globales (*, body, input[type=text]) que romperian el resto de la consola.
+ * Ademas globals.css ya define input/select/button con min-width y fondo de
+ * acento, asi que lo primero que hace este archivo es neutralizar esa herencia
+ * dentro del contenedor y recien despues aplicar el diseno original.
+ */
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700;800&display=swap");
+
+.calcv2 {
+  --bg: #f5f3ee;
+  --card: #fff;
+  --card2: #faf9f7;
+  --border: #e2ddd6;
+  --ink: #1a1814;
+  --muted: #8a8580;
+  --green: #1a5c3a;
+  --green-l: #e8f3ed;
+  --amber: #b45309;
+  --amber-l: #fef3c7;
+  --blue: #1d4ed8;
+  --blue-l: #eff6ff;
+  --purple: #7c3aed;
+  --purple-l: #f5f3ff;
+  --red: #b91c1c;
+  --red-l: #fee2e2;
+
+  font-family: "Outfit", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 16px;
+  color-scheme: light;
+}
+
+.calcv2 * {
+  box-sizing: border-box;
+}
+
+/* Neutraliza globals.css dentro del contenedor.
+ * Va envuelto en :where() a proposito: asi la regla pesa lo mismo que un solo
+ * selector de clase y cualquier regla del diseno original (que siempre lleva
+ * clase + tipo, o clase + atributo) la gana. Sin :where(), el :not() sumaba
+ * especificidad y este reset se comia el estilo de los inputs. */
+.calcv2 :where(input:not([type="checkbox"]):not([type="range"])),
+.calcv2 :where(select),
+.calcv2 :where(button) {
+  font: inherit;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font-weight: 400;
+}
+.calcv2 input[type="checkbox"] {
+  min-height: 0;
+  min-width: 0;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  accent-color: var(--green);
+}
+
+.calcv2 .wrap {
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+/* header */
+.calcv2 .eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.calcv2 .big-h1 {
+  font-size: clamp(24px, 5vw, 40px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: var(--ink);
+}
+.calcv2 .big-h1 em {
+  font-style: normal;
+  color: var(--green);
+}
+.calcv2 .subtitle {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* card */
+.calcv2 .card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin-bottom: 14px;
+}
+.calcv2 .sec {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.calcv2 .sec-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+/* inputs */
+.calcv2 input[type="text"],
+.calcv2 input[type="number"],
+.calcv2 select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--card2);
+  outline: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+  -moz-appearance: textfield;
+}
+.calcv2 input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+.calcv2 input:focus,
+.calcv2 select:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(26, 92, 58, 0.08);
+  background: #fff;
+}
+.calcv2 .mw {
+  position: relative;
+}
+.calcv2 .mw input {
+  padding-left: 22px;
+  font-family: "DM Mono", ui-monospace, SFMono-Regular, monospace;
+}
+.calcv2 .mw::before {
+  content: "$";
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.calcv2 .pw {
+  position: relative;
+}
+.calcv2 .pw input {
+  padding-right: 22px;
+}
+.calcv2 .pw::after {
+  content: "%";
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* cost rows */
+.calcv2 .crow {
+  display: grid;
+  grid-template-columns: 1fr 130px 30px;
+  gap: 7px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.calcv2 .btn-del {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.calcv2 .btn-del:hover {
+  border-color: var(--red);
+  color: var(--red);
+  background: var(--red-l);
+}
+.calcv2 .btn-add {
+  width: 100%;
+  padding: 8px;
+  border: 1.5px dashed var(--border);
+  border-radius: 9px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s;
+  margin-top: 4px;
+}
+.calcv2 .btn-add:hover {
+  border-color: var(--green);
+  color: var(--green);
+  background: var(--green-l);
+}
+
+/* range */
+.calcv2 input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+}
+.calcv2 input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--green);
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+.calcv2 input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--green);
+  cursor: pointer;
+  border: 2px solid #fff;
+}
+
+/* info boxes */
+.calcv2 .info {
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.65;
+  margin-bottom: 12px;
+}
+.calcv2 .info-amber {
+  background: var(--amber-l);
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+.calcv2 .info-blue {
+  background: var(--blue-l);
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+}
+.calcv2 .info-green {
+  background: var(--green-l);
+  border: 1px solid #6ee7b7;
+  color: var(--green);
+}
+
+/* machines */
+.calcv2 .mach-row {
+  display: grid;
+  grid-template-columns: 1fr 100px 100px 30px;
+  gap: 7px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.calcv2 .col-h {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 3px;
+}
+
+/* retenciones */
+.calcv2 .ret-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 640px) {
+  .calcv2 .ret-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.calcv2 .ret-box {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.calcv2 .ret-box label {
+  font-size: 12px;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 6px;
+}
+.calcv2 .ret-box small {
+  font-size: 11px;
+  color: #93c5fd;
+  display: block;
+  margin-top: 2px;
+}
+
+/* margin target */
+.calcv2 .dark-card {
+  background: var(--ink);
+  color: #fff;
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin-bottom: 14px;
+}
+.calcv2 .dark-card .sec {
+  color: rgba(255, 255, 255, 0.4);
+}
+.calcv2 .margin-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.calcv2 .margin-row input[type="range"] {
+  background: rgba(255, 255, 255, 0.15);
+}
+.calcv2 .margin-row input[type="range"]::-webkit-slider-thumb {
+  background: #6ee7b7;
+  border-color: var(--ink);
+}
+.calcv2 .margin-row input[type="number"] {
+  width: 70px;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  flex-shrink: 0;
+  font-family: "DM Mono", ui-monospace, monospace;
+}
+.calcv2 .margin-big {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 52px;
+  font-weight: 500;
+  color: #6ee7b7;
+  line-height: 1;
+}
+.calcv2 .mtype-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.calcv2 .mtype-btn {
+  flex: 1;
+  padding: 9px 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  transition: all 0.15s;
+  min-width: 110px;
+}
+.calcv2 .mtype-btn.on {
+  background: rgba(110, 231, 183, 0.15);
+  border-color: #6ee7b7;
+  color: #6ee7b7;
+}
+
+/* result */
+.calcv2 .res-card {
+  background: var(--green);
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin-bottom: 14px;
+  color: #fff;
+}
+.calcv2 .res-hl {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+  margin-bottom: 6px;
+}
+.calcv2 .res-price {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: clamp(38px, 8vw, 62px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.calcv2 .res-sub {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 6px;
+}
+.calcv2 .res-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+.calcv2 .res-box {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  padding: 11px 14px;
+}
+.calcv2 .res-box-l {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 4px;
+}
+.calcv2 .res-box-v {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 18px;
+  color: #fff;
+}
+.calcv2 .wf-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  margin-bottom: 3px;
+}
+.calcv2 .sc-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 9px;
+  margin-top: 16px;
+}
+@media (max-width: 560px) {
+  .calcv2 .sc-row {
+    grid-template-columns: 1fr;
+  }
+}
+.calcv2 .sc {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 11px;
+  padding: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+  width: 100%;
+}
+.calcv2 .sc:hover {
+  background: rgba(255, 255, 255, 0.13);
+}
+.calcv2 .sc.on {
+  border-color: #6ee7b7;
+  background: rgba(110, 231, 183, 0.12);
+}
+.calcv2 .sc-t {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 5px;
+}
+.calcv2 .sc-p {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 22px;
+  color: #fff;
+}
+.calcv2 .sc-d {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 3px;
+}
+
+/* qty row */
+.calcv2 .qty-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.calcv2 .qty-row label {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.calcv2 .qty-val {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 14px;
+  color: var(--green);
+  font-weight: 600;
+  min-width: 55px;
+  text-align: right;
+}
+
+/* preset btns */
+.calcv2 .presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.calcv2 .pre-btn {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 5px 11px;
+  background: none;
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--muted);
+  transition: all 0.15s;
+}
+.calcv2 .pre-btn:hover {
+  border-color: var(--purple);
+  color: var(--purple);
+  background: var(--purple-l);
+}
+
+/* ── proveedor / productos reales (reemplaza la lista manual) ── */
+.calcv2 .prov-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+@media (max-width: 640px) {
+  .calcv2 .prov-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.calcv2 .prod-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 9px;
+  margin-bottom: 10px;
+  /* Un proveedor puede tener cientos de productos: sin tope, las cajitas se
+   * comen la pagina entera y la calculadora queda inalcanzable. */
+  max-height: 330px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.calcv2 .prod-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  padding: 11px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.calcv2 .prod-card:hover {
+  border-color: var(--green);
+  background: var(--green-l);
+}
+.calcv2 .prod-card.on {
+  border-color: var(--green);
+  background: var(--green-l);
+  box-shadow: 0 0 0 3px rgba(26, 92, 58, 0.08);
+}
+.calcv2 .prod-card-n {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.25;
+}
+.calcv2 .prod-card-m {
+  font-size: 11px;
+  color: var(--muted);
+}
+.calcv2 .prod-card-p {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 16px;
+  color: var(--green);
+  font-weight: 600;
+  margin-top: auto;
+}
+.calcv2 .prod-card-p.sinprecio {
+  color: var(--red);
+  font-size: 12px;
+}
+.calcv2 .prod-vacio {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 10px 0;
+}
