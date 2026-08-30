@@ -61,6 +61,41 @@ creada en STAGING para las pruebas de este bloque. Sigue activa al
 escribir esto — revisar si conviene revocarla (mismo patrón que la cuenta
 `qa-e2e@estampados-test.example` de la sesión anterior, ya revocada).
 
+**EN CURSO (2026-08-30, más tarde):** el usuario pidió explícitamente portar el
+HTML de referencia `C:\Users\willi\Downloads\cotizador-v2.html` (calculadora
+client-side con física real: bordado, DTF por área/rollo, sublimación por
+hoja+tinta+luz, DTF-UV) tal cual para la sección "Técnica de marcación" y la
+calculadora de abajo, PERO reemplazando la sección "Costos del producto" (que
+en el HTML original es una lista manual editable) por un selector de
+proveedor real + tarjetas de producto real de ese proveedor con su precio
+(usa `fn_consola_buscar_proveedores_producto`/`fn_consola_buscar_productos_proveedor`,
+ya existentes). Esto ROMPE deliberadamente la convención "zero client-JS" del
+proyecto — es un client component nuevo y aislado, no un error.
+Dispatch a un agente (opus) corriendo en background con instrucciones
+detalladas: portar fielmente el HTML+CSS+JS de referencia, conectar solo la
+parte de costos a datos reales, integrarlo en /cotizador SIN romper el flujo
+proveedor-first server-rendered que ya existe (queda de lado, no se borra),
+verificar con Playwright real (login con qa-e2e-2@estampados-test.example)
+que carga proveedores/productos reales y que el cálculo responde en vivo, y
+commitear con mensaje honesto. Resultado pendiente al escribir esto — revisar
+el commit más reciente en `git log` de master y el reporte del agente antes
+de asumir que está terminado o que funciona.
+
+**RESUELTO (2026-08-30, más tarde):** la calculadora visual (commit `284c72b`
+en master) quedó integrada y verificada en vivo en este checkout — proveedor
+real, productos reales con precio, técnica de marcación con las fórmulas del
+HTML de referencia, cálculo en vivo, 0 errores de consola. El agente la había
+construido en el worktree (commit `199fdea`); como el `page.tsx` de master ya
+había divergido, la integración a `page.tsx` se rehizo a mano en este
+checkout (no se copió el diff del worktree tal cual). Queda pendiente, a
+propósito: técnica sin conectar a datos curados, la calculadora no emite
+cotización real (es solo estimación visual), y solo se ve para rol ADMIN.
+
+Nota aparte: en algún momento el checkout principal apareció en una rama
+`ai/harness-pilot` en vez de `master` (mismo commit, sin pérdida de datos) —
+no sé qué la creó. Se volvió a `master` sin tocar esa rama. Si aparece de
+nuevo, no es nada que yo haya hecho a propósito.
+
 **Para otra sesión/IA que retome esto:** trabajá en el checkout principal
 (`Estampados/web`), no en el worktree, salvo que el usuario diga lo
 contrario. Verificá con Playwright antes de asumir que algo está roto o
