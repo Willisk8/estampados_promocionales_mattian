@@ -342,9 +342,9 @@ export default async function PaginaCotizador({
                 type="submit"
                 formNoValidate
                 disabled={!puedeCotizar || !sp.id_proveedor}
-                title="Filtrar productos del proveedor"
+                title="Filtrar productos del proveedor y aplicar la cantidad escrita abajo"
               >
-                Filtrar
+                Filtrar / aplicar cantidad
               </button>
             </div>
             <input
@@ -356,6 +356,13 @@ export default async function PaginaCotizador({
               disabled={!puedeCotizar}
             />
           </div>
+
+          {!sp.cantidad && (
+            <p style={{ fontSize: 13, color: "var(--texto-suave)", marginBottom: 0 }}>
+              Escribi la cantidad y hace click en &quot;Filtrar / aplicar cantidad&quot; -
+              recien ahi se habilitan la tecnica y el calculo de precio.
+            </p>
+          )}
 
           {productoSeleccionado && (
             <p style={{ marginBottom: 0, color: "var(--texto-suave)" }}>
@@ -656,10 +663,22 @@ export default async function PaginaCotizador({
             <button
               type="submit"
               disabled={!puedeCotizar || !sp.id_precio_proveedor_snapshot || !sp.cantidad}
+              title={
+                !sp.cantidad
+                  ? "Falta aplicar la cantidad en el paso 2"
+                  : !sp.id_precio_proveedor_snapshot
+                    ? "Falta elegir una oferta de proveedor en el paso 3"
+                    : undefined
+              }
             >
               Calcular precio
             </button>
           </div>
+          {sp.cantidad && !sp.id_precio_proveedor_snapshot && (
+            <p style={{ fontSize: 13, color: "var(--texto-suave)", marginTop: "0.5rem", marginBottom: 0 }}>
+              Elegi una oferta de proveedor en el paso 3 para habilitar el calculo.
+            </p>
+          )}
         </div>
       </form>
 
