@@ -54,6 +54,12 @@ BEGIN
  ASSERT (preview->>'total')::numeric=72002,
   'El unitario 1946 redondeado al peso produce 72002';
  preview := fn_consola_previsualizar_cotizacion_cliente(NULL,
+  jsonb_build_array(
+   jsonb_build_object('id_precio_proveedor_snapshot','00000000-0000-4000-fc85-000000000023','unidades_entregar',12),
+   jsonb_build_object('id_precio_proveedor_snapshot','00000000-0000-4000-fc85-000000000023','unidades_entregar',30)),0);
+ ASSERT preview->>'status'='DUPLICATE_CONFIGURATION',
+  'Dividir la misma oferta y tecnica no cambia artificialmente el tramo ni duplica costos';
+ preview := fn_consola_previsualizar_cotizacion_cliente(NULL,
   jsonb_build_array(jsonb_build_object('id_precio_proveedor_snapshot',
   '00000000-0000-4000-fc85-000000000023','unidades_entregar',37,
   'reasignacion_sobrante',35000,'motivo_ajuste','35 unidades reservadas para pedido siguiente')),0);

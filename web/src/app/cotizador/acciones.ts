@@ -24,6 +24,7 @@ const MENSAJES_MULTILINEA: Record<string, string> = {
   NO_LINES: "La cotizacion no tiene ninguna linea de producto.",
   INVALID_LINES: "El formato de las lineas es invalido.",
   TOO_MANY_LINES: "Demasiadas lineas en una sola cotizacion (maximo 50).",
+  DUPLICATE_CONFIGURATION: "Consolida en una sola linea las unidades de la misma oferta y configuracion tecnica.",
   INVALID_LINE: "Una de las lineas llego con formato invalido.",
   INVALID_LINE_SNAPSHOT: "Una linea no tiene una observacion de precio valida.",
   INVALID_QUANTITY:

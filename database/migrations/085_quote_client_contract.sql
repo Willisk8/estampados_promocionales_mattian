@@ -412,6 +412,19 @@ BEGIN
         v_unidades_totales := v_unidades_totales + v_unidades;
     END LOOP;
 
+    -- Una misma oferta/configuracion no puede dividirse para cambiar el tramo
+    -- de margen o repetir preparaciones. En V2 el usuario consolida unidades
+    -- en una sola linea; configuraciones tecnicas diferentes siguen separadas.
+    IF EXISTS (
+        SELECT 1 FROM tmp_ml_lineas
+        GROUP BY id_snapshot, configuracion
+        HAVING count(*) > 1
+    ) THEN
+        RETURN QUERY SELECT NULL::uuid,NULL::bigint,NULL::numeric,v_n_lineas,
+            'DUPLICATE_CONFIGURATION'::text;
+        RETURN;
+    END IF;
+
     -- Reparto del transporte del PEDIDO entre las lineas.
     IF v_transporte > 0 THEN
         IF v_modo = 'SEPARATE_LINE' THEN

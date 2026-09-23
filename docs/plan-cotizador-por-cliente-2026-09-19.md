@@ -14,6 +14,11 @@ mismo SHA y promoción controlada. También faltan pruebas reales con Auth/PDF y
 Storage, grupos de líneas equivalentes, y la validación comercial con pedidos
 reales. Este avance no certifica producción.
 
+El motor V2 ahora rechaza dos líneas de la misma oferta y configuración técnica
+en un pedido para evitar descuentos por tramo o preparaciones duplicadas al
+partir cantidades. El usuario debe consolidarlas manualmente en una línea; la
+agrupación automática y los grupos de trabajo compartidos siguen pendientes.
+
 Revisión posterior del 2026-09-23: al duplicar un histórico V2, la geometría
 DTF guardada vuelve a la calculadora y el costo DTF calculado ya no se copia
 como un importe fijo adicional. Si el histórico trae una geometría inválida,
