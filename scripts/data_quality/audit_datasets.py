@@ -125,6 +125,11 @@ class DivipolaMatcher:
             (search_key(row["department"]), search_key(row["municipality"])): row
             for row in rows
         }
+        # Mismo codigo 73268: alcaldia de El Espinal y ficha DANE "Espinal".
+        # https://sitios.dane.gov.co/cnpv/app/views/informacion/fichas/73268.pdf
+        espinal = next((r for r in rows if r['divipola']=='73268'), None)
+        if espinal:
+            self.exact[('tolima','el_espinal')] = espinal
         self.department_names: dict[str, str] = {}
         self.by_department: dict[str, list[dict[str, str]]] = defaultdict(list)
         for row in rows:

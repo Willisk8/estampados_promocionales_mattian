@@ -27,7 +27,9 @@ export default async function PaginaLogin({
     if (error) {
       // No se distingue "usuario inexistente" de "clave incorrecta": decirlo
       // permitiria enumerar cuentas validas.
-      redirect("/login?error=credenciales");
+      const falloServicio = !error.status || error.status >= 500;
+      const vuelta = new URLSearchParams({ error: falloServicio ? "servicio" : "credenciales", siguiente });
+      redirect(`/login?${vuelta.toString()}`);
     }
 
     redirect(siguiente);
@@ -41,6 +43,11 @@ export default async function PaginaLogin({
       {params.error === "credenciales" && (
         <p className="error-texto">
           Correo o contrasena incorrectos.
+        </p>
+      )}
+      {params.error === "servicio" && (
+        <p className="error-texto" role="alert">
+          No se pudo conectar con el servicio de acceso. Intenta de nuevo cuando este disponible.
         </p>
       )}
 

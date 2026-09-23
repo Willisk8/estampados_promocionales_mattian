@@ -38,6 +38,7 @@ export async function crearClienteServidor() {
 export type RolConsola = "ADMIN" | "COMERCIAL" | "LECTURA";
 
 export type SesionConsola = {
+  userId: string;
   email: string;
   rol: RolConsola;
 };
@@ -62,5 +63,5 @@ export const obtenerSesionConsola = cache(async (): Promise<SesionConsola | null
     .maybeSingle();
 
   if (!data || !data.activo) return null;
-  return { email: data.email, rol: data.rol as RolConsola };
+  return { userId, email: data.email, rol: data.rol as RolConsola };
 });

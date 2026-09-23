@@ -1,5 +1,10 @@
 -- database/tests/test_quote_supplier_first.sql
 BEGIN;
+-- Fixture-owner projection inspects persisted rows; dedicated RLS tests
+-- verify that these sensitive columns are not readable through the API.
+CREATE TEMP VIEW audit_quote_items AS SELECT * FROM public.cotizacion_item;
+GRANT SELECT ON audit_quote_items TO authenticated;
+
 
 INSERT INTO auth.users (id, email) VALUES
     ('00000000-0000-4000-fe00-000000000001', 'admin-supplier-first@prueba.local'),
@@ -142,7 +147,7 @@ BEGIN
     ASSERT r.id_cotizacion IS NOT NULL, 'debe devolver id_cotizacion';
 
     SELECT * INTO v_item
-      FROM cotizacion_item
+      FROM pg_temp.audit_quote_items
      WHERE id_cotizacion = r.id_cotizacion;
 
     ASSERT v_item.source_mode = 'SUPPLIER_PRODUCT', format('source_mode esperado SUPPLIER_PRODUCT, obtuve %s', v_item.source_mode);
@@ -195,7 +200,7 @@ BEGIN
     ASSERT r.status = 'OK', format('crear 37 unidades debe ser OK, obtuvo %s', r.status);
 
     SELECT * INTO v_item
-      FROM cotizacion_item
+      FROM pg_temp.audit_quote_items
      WHERE id_cotizacion = r.id_cotizacion;
 
     ASSERT v_item.cantidad_comprada = 72, format('37 unidades en caja x36 requieren comprar 72, obtuvo %s', v_item.cantidad_comprada);

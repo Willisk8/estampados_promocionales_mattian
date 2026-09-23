@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
+import { cotizacionParaModificar } from "@/lib/cotizacion-origen";
 import { SinAcceso } from "@/componentes/sin-acceso";
 import { CalculadoraCotizador } from "@/componentes/calculadora-cotizador";
 import SelectAutoSubmit from "@/componentes/select-auto-submit";
@@ -248,14 +249,73 @@ export default async function PaginaCotizador({
     ? previewFilas.reduce((acc, f) => acc + Number(f.precio_resultante ?? 0), 0)
     : null;
 
+  // ── MODIFICAR UNA COTIZACION YA EMITIDA ─────────────────────────────
+  // `cotizacion` es inmutable (RLS deny_update, migracion 029). "Modificar" no
+  // edita nada: relee los snapshots congelados del original y precarga la
+  // calculadora para emitir una cotizacion NUEVA, con numero propio. Solo se
+  // hace para ADMIN porque es el unico rol que ve la calculadora.
+  const origen =
+    esAdmin && sp.desde_cotizacion
+      ? await cotizacionParaModificar(sp.desde_cotizacion)
+      : null;
+
+  // Nota sugerida, EDITABLE: deja la trazabilidad a la vista del cliente en el
+  // PDF sin inventar una columna de esquema para la referencia.
+  const notasIniciales = origen
+    ? `Ajusta a cotización #${origen.numero} por solicitud del cliente.`
+    : "";
+
+  // El selector de proveedor de cada linea se llena con `proveedores`, que la
+  // RPC topea en 80 filas. Si el proveedor de una linea precargada no cayo en
+  // ese tope, el <select> se veria vacio aunque el estado tenga el id correcto.
+  // Se agregan los que falten a partir del snapshot del propio item.
+  const proveedoresCalculadora: Proveedor[] = [...proveedores];
+  if (origen) {
+    for (const linea of origen.lineas) {
+      if (!linea.idProveedor) continue;
+      if (proveedoresCalculadora.some((p) => p.id_proveedor === linea.idProveedor)) continue;
+      proveedoresCalculadora.push({
+        id_proveedor: linea.idProveedor,
+        nombre: linea.nombreProveedor || "Proveedor de la cotización original",
+        ciudad: null,
+        productos: 0,
+      });
+    }
+  }
+
+  // Cliente preseleccionado: al modificar una cotizacion se hereda el de la
+  // original; si no, el que llega desde /organizaciones/[id].
+  const idOrganizacionPreseleccionada = origen?.id_organizacion ?? sp.id_organizacion ?? "";
+
+  // MISMO PROBLEMA QUE CON LOS PROVEEDORES, Y AQUI MUERDE MAS: la lista de
+  // organizaciones se topea en 120 filas ordenadas por nombre_legal y STAGING
+  // tiene ~1.000. Un cliente que no cae en ese tope deja el <select> en blanco
+  // aunque el id sea correcto, en los dos flujos de esta pagina. Se trae esa
+  // organizacion puntual (una consulta extra, solo cuando hace falta).
+  const organizacionesCotizador: Organizacion[] = [...organizaciones];
+  if (
+    idOrganizacionPreseleccionada &&
+    !organizacionesCotizador.some((o) => o.id_organizacion === idOrganizacionPreseleccionada)
+  ) {
+    const { data: orgFaltante } = await supabase
+      .from("organizacion")
+      .select("id_organizacion, nombre_legal, nit")
+      .eq("id_organizacion", idOrganizacionPreseleccionada)
+      .maybeSingle();
+    if (orgFaltante) organizacionesCotizador.unshift(orgFaltante as Organizacion);
+  }
+
   const productoSeleccionado = productosProveedor.find(
     (p) => p.id_producto_proveedor === sp.id_producto_proveedor
   );
   const ofertaSeleccionada = ofertas.find((o) => o.id_snapshot === sp.id_precio_proveedor_snapshot);
   const tecnicaSeleccionada = tecnicas.find((t) => t.id_snapshot === sp.id_snapshot_tecnica);
 
+  // `id_organizacion` NO cuenta como "flujo en uso": ahora tambien llega desde
+  // /organizaciones/[id] para preseleccionar el cliente EN LA CALCULADORA, y no
+  // tiene sentido desplegar el flujo server-rendered por eso. Cualquier uso real
+  // del flujo de abajo trae ademas id_proveedor y compania.
   const flujoEnUso = [
-    "id_organizacion",
     "id_proveedor",
     "q_proveedor",
     "q_producto",
@@ -296,9 +356,40 @@ export default async function PaginaCotizador({
         </div>
       )}
 
+      {sp.desde_cotizacion && esAdmin && !origen && (
+        <div className="aviso-caja" data-testid="cotizador-origen-error">
+          No se pudo cargar la cotización de origen: no existe o ninguna de sus
+          líneas tiene la observación de precio del proveedor que hace falta para
+          volver a emitirla.
+        </div>
+      )}
+
+      {origen && (
+        <div className="aviso-caja neutro" data-testid="cotizador-origen-aviso">
+          Estás ajustando la <a href={`/cotizador/${origen.id_cotizacion}`}>cotización #{origen.numero}</a>:
+          se cargaron {origen.lineas.length} línea(s) con sus cantidades y costos originales.
+          {origen.omitidas > 0
+            ? ` ${origen.omitidas} línea(s) del original no se pudieron cargar por falta de observación de precio.`
+            : ""}{" "}
+          La #{origen.numero} no se modifica: al emitir se crea una cotización
+          nueva con número propio. Los parámetros físicos de la marcación no se
+          guardan en la cotización, así que su costo vuelve como costo adicional
+          del producto. Revisa los márgenes y las retenciones para esta nueva
+          cotización: estos controles comienzan con los valores de la calculadora.
+        </div>
+      )}
+
       <h2>Calculadora visual (estimacion)</h2>
       {esAdmin ? (
-        <CalculadoraCotizador proveedoresIniciales={proveedores} esAdmin={esAdmin} />
+        <CalculadoraCotizador
+          key={`${sp.desde_cotizacion ?? "nueva"}:${idOrganizacionPreseleccionada}`}
+          proveedoresIniciales={proveedoresCalculadora}
+          organizacionesIniciales={organizacionesCotizador}
+          esAdmin={esAdmin}
+          lineasIniciales={origen?.lineas}
+          idOrganizacionInicial={idOrganizacionPreseleccionada}
+          notasIniciales={notasIniciales}
+        />
       ) : (
         <div className="aviso-caja neutro">
           La calculadora visual expone costos, desgaste y margen: solo esta disponible
@@ -319,7 +410,7 @@ export default async function PaginaCotizador({
           <div className="filtros">
             <select name="id_organizacion" defaultValue={sp.id_organizacion ?? ""} disabled={!puedeCotizar}>
               <option value="">Sin cliente asociado</option>
-              {organizaciones.map((o) => (
+              {organizacionesCotizador.map((o) => (
                 <option key={o.id_organizacion} value={o.id_organizacion}>
                   {o.nombre_legal}
                   {o.nit ? ` - ${o.nit}` : ""}

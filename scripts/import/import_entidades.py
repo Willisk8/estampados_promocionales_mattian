@@ -43,6 +43,7 @@ from scripts.data_quality.normalization import (
     normalize_email as normalize_email_standard,
     normalize_text,
 )
+from scripts.data_quality.email_checks import email_syntax
 
 
 # --------------------------------------------------------------------------- #
@@ -84,7 +85,7 @@ MALFORMED_EMAIL_DOMAINS = frozenset({
 
 
 def is_valid_email(value: str | None) -> bool:
-    return bool(value and EMAIL_RE.fullmatch(value.strip()))
+    return bool(value and email_syntax(value.strip())[2] == 'VALID')
 
 
 def email_domain(value: str | None) -> str:

@@ -5,6 +5,11 @@
 -- ============================================================
 
 BEGIN;
+-- Fixture-owner projection inspects persisted rows; dedicated RLS tests
+-- verify that these sensitive columns are not readable through the API.
+CREATE TEMP VIEW audit_quote_items AS SELECT * FROM public.cotizacion_item;
+GRANT SELECT ON audit_quote_items TO authenticated;
+
 
 INSERT INTO auth.users (id, email) VALUES
     ('00000000-0000-4000-fa00-000000000001', 'comercial-personalizacion@prueba.local');
@@ -65,7 +70,7 @@ BEGIN
 
     PERFORM set_config('app.id_cotizacion_personalizada', v_id_cotizacion::text, false);
 
-    PERFORM 1 FROM cotizacion_item ci
+    PERFORM 1 FROM pg_temp.audit_quote_items ci
      WHERE ci.id_cotizacion = v_id_cotizacion
        AND ci.id_tecnica = '00000000-0000-4000-fa00-000000000002'
        AND ci.personalizacion = jsonb_build_object('color', 'azul', 'texto', 'Bienvenido');

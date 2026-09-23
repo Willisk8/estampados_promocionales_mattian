@@ -9,6 +9,15 @@
 -- ============================================================
 
 BEGIN;
+-- Fixture-owner projection inspects persisted rows; dedicated RLS tests
+-- verify that these sensitive columns are not readable through the API.
+CREATE TEMP VIEW audit_quote_items AS SELECT * FROM public.cotizacion_item;
+GRANT SELECT ON audit_quote_items TO authenticated;
+
+-- Fixture-owner view verifies emitted events independently of console RLS.
+CREATE TEMP VIEW audit_quote_events AS SELECT * FROM public.cotizacion_evento;
+GRANT SELECT ON audit_quote_events TO authenticated;
+
 
 INSERT INTO auth.users (id, email) VALUES
     ('00000000-0000-4000-fb00-000000000001', 'comercial-idempotencia@prueba.local'),
@@ -88,11 +97,11 @@ BEGIN
        AND idempotency_key = 'fixture-key-quote-idempotente';
 
     SELECT COUNT(*) INTO v_count_items
-      FROM cotizacion_item
+      FROM pg_temp.audit_quote_items
      WHERE id_cotizacion = r1.id_cotizacion;
 
     SELECT COUNT(*) INTO v_count_eventos
-      FROM cotizacion_evento
+      FROM pg_temp.audit_quote_events
      WHERE id_cotizacion = r1.id_cotizacion
        AND tipo_evento = 'CREADA';
 

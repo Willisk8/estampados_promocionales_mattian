@@ -107,6 +107,22 @@ def sin_comentarios(sql: str) -> str:
     return sql
 
 
+def funciones_sin_search_path(sql: str) -> list[str]:
+    """Inspecciona cabeceras reales, no COMMENT ON ni cadenas del cuerpo."""
+    funciones = []
+    patron = r"CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+((?:public\.)?\w+)\s*\("
+    texto = sin_comentarios(sql)
+    for match in re.finditer(patron, texto, re.I):
+        resto = texto[match.end():]
+        fin = re.search(r"\bAS\s+(?:\$\w*\$|')", resto, re.I)
+        if not fin:
+            continue
+        cabecera = resto[:fin.start()]
+        if re.search(r"SECURITY\s+DEFINER", cabecera, re.I) and not re.search(r"SET\s+search_path", cabecera, re.I):
+            funciones.append(match.group(1))
+    return funciones
+
+
 def remediada_en_otra_migracion(funcion: str) -> bool:
     """¿Alguna migracion fija el search_path de esta funcion con ALTER FUNCTION?
 
@@ -194,14 +210,14 @@ def auditar_migracion(path: Path, rep: Reporte) -> None:
             )
 
     # Toda tabla nueva nace con RLS y con negacion por defecto.
-    for tabla in re.findall(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)", sql, re.I):
-        if not re.search(r"ALTER\s+TABLE\s+" + tabla + r"\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY", sql, re.I):
+    for tabla in re.findall(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:\w+\.)?(\w+)", sql, re.I):
+        if not re.search(r"ALTER\s+TABLE\s+(?:\w+\.)?" + tabla + r"\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY", sql, re.I):
             rep.error(
                 "rls-obligatorio",
                 "la tabla '" + tabla + "' se crea sin ENABLE ROW LEVEL SECURITY",
                 rel,
             )
-        elif not re.search(r"CREATE\s+POLICY\s+\w+\s+ON\s+" + tabla + r"\b", sql, re.I):
+        elif not re.search(r"CREATE\s+POLICY\s+\w+\s+ON\s+(?:\w+\.)?" + tabla + r"\b", sql, re.I):
             rep.error(
                 "negacion-por-defecto",
                 "la tabla '" + tabla + "' habilita RLS pero no define ninguna politica",
@@ -216,7 +232,7 @@ def auditar_migracion(path: Path, rep: Reporte) -> None:
     # inmutable por la regla de arriba, y su brecha se cierra con una migracion
     # nueva (eso hace la 025), no editandola.
     tablas_creadas = [] if ya_aplicada else re.findall(
-        r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)", sql, re.I)
+        r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:\w+\.)?(\w+)", sql, re.I)
     if tablas_creadas:
         for tabla in tablas_creadas:
             revocada = re.search(
@@ -270,7 +286,7 @@ def auditar_migracion(path: Path, rep: Reporte) -> None:
         if re.search(r"v_rol\s+IS\s+NULL\s+OR\s*$", contexto_previo, re.I):
             continue
         anterior = sql[: m.start()]
-        creadas = re.findall(r"CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(\w+)", anterior, re.I)
+        creadas = re.findall(r"CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?(\w+)", anterior, re.I)
         funcion = creadas[-1] if creadas else None
         if funcion and guardia_rol_null_corregida(funcion):
             continue
@@ -294,24 +310,10 @@ def auditar_migracion(path: Path, rep: Reporte) -> None:
     # SECURITY DEFINER sin search_path fijo es inyectable. Una migracion
     # posterior puede corregirlo con ALTER FUNCTION, asi que se comprueba el
     # conjunto de migraciones antes de avisar.
-    for definer in re.finditer(r"SECURITY\s+DEFINER", sql, re.I):
-        ventana = sql[definer.start(): definer.start() + 400]
-        if re.search(r"SET\s+search_path", ventana, re.I):
-            continue
-        anterior = sql[: definer.start()]
-        creadas = re.findall(r"CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(\w+)", anterior, re.I)
-        if not creadas:
-            continue
-        funcion = creadas[-1]
+    for funcion in funciones_sin_search_path(sql):
         if remediada_en_otra_migracion(funcion):
             continue
-        rep.warn(
-            "search-path-fijo",
-            "la funcion '" + funcion + "' es SECURITY DEFINER sin "
-            "'SET search_path = public, pg_temp' y ninguna migracion lo corrige",
-            rel,
-        )
-        break
+        rep.warn("search-path-fijo", "la funcion '" + funcion + "' es SECURITY DEFINER sin SET search_path fijo", rel)
 
     # Referencias a objetos de Supabase que CI no tiene sin el bootstrap.
     usa_auth = re.search(r"\bauth\.(users|uid)\b", sql, re.I)

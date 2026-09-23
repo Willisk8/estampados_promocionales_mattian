@@ -21,7 +21,7 @@ export function NavLateral({ rol, email }: { rol: string; email: string }) {
     <nav className="barra-lateral">
       <div className="marca">
         Consola Estampados
-        <span>STAGING · operacion controlada</span>
+        <span>Operación controlada</span>
       </div>
 
       {ENLACES.map(({ href, texto }) => {

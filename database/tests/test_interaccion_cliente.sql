@@ -5,6 +5,10 @@
 -- ============================================================
 
 BEGIN;
+-- Fixture-owner view verifies emitted events independently of console RLS.
+CREATE TEMP VIEW audit_quote_events AS SELECT * FROM public.cotizacion_evento;
+GRANT SELECT ON audit_quote_events TO authenticated;
+
 
 INSERT INTO auth.users (id, email) VALUES
     ('00000000-0000-4000-f000-000000000001', 'lectura-interaccion@prueba.local'),
@@ -254,7 +258,7 @@ BEGIN
      WHERE id_organizacion = '00000000-0000-4000-f000-000000000010';
 
     SELECT count(*) INTO v_eventos_cotizacion
-      FROM cotizacion_evento ce
+      FROM pg_temp.audit_quote_events ce
       JOIN cotizacion c ON c.id_cotizacion = ce.id_cotizacion
      WHERE c.id_organizacion = '00000000-0000-4000-f000-000000000010';
 
