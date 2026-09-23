@@ -26,6 +26,13 @@ type Canal = {
   estado: string;
   fuente: string | null;
   base_contacto_codigo: string | null;
+  celular: string | null;
+  fijo: string | null;
+  indicativo: string | null;
+  numero_local: string | null;
+  indicativo_inferido: boolean;
+  dominio_estado: string | null;
+  buzon_estado: string | null;
 };
 
 type Persona = {
@@ -199,7 +206,7 @@ export default async function PaginaOrganizacion({
     propuestas,
   ] = await Promise.all([
     supabase.from("organizacion").select("*").eq("id_organizacion", id).maybeSingle(),
-    supabase.rpc("fn_consola_canales_organizacion", { p_id_organizacion: id }),
+    supabase.rpc("fn_consola_canales_detalle", { p_id_organizacion: id }),
     supabase.rpc("fn_consola_personas_organizacion", { p_id_organizacion: id }),
     supabase.from("cat_tipo_organizacion").select("id, codigo, descripcion").order("codigo"),
     supabase
@@ -528,6 +535,10 @@ export default async function PaginaOrganizacion({
                 <tr>
                   <th>Tipo</th>
                   <th>Valor</th>
+                  <th>Celular</th>
+                  <th>Fijo</th>
+                  <th>Indicativo / local</th>
+                  <th>Validación del correo</th>
                   <th>Confianza</th>
                   <th>Estado</th>
                   <th>Base de contacto</th>
@@ -539,6 +550,10 @@ export default async function PaginaOrganizacion({
                   <tr key={c.id_canal_contacto}>
                     <td>{c.tipo}</td>
                     <td>{c.valor}</td>
+                    <td>{c.celular ?? "—"}</td>
+                    <td>{c.fijo ?? "—"}</td>
+                    <td>{c.numero_local ? `${c.indicativo ?? "sin indicativo"} / ${c.numero_local}${c.indicativo_inferido ? " (inferido; revisar)" : ""}` : "—"}</td>
+                    <td>{c.tipo === "EMAIL" ? `Dominio: ${c.dominio_estado ?? "sin comprobar"}. Buzón: ${c.buzon_estado ?? "NO_VERIFICADO"}` : "—"}</td>
                     <td>{c.confianza}</td>
                     <td>
                       <span className={c.estado === "ACTIVE" ? "insignia" : "insignia alerta"}>{c.estado}</span>
@@ -555,7 +570,7 @@ export default async function PaginaOrganizacion({
                 ))}
                 {listaCanales.length === 0 && (
                   <tr>
-                    <td colSpan={6} style={{ color: "var(--texto-suave)" }}>
+                    <td colSpan={10} style={{ color: "var(--texto-suave)" }}>
                       Sin canales registrados.
                     </td>
                   </tr>
@@ -646,6 +661,18 @@ export default async function PaginaOrganizacion({
           )}
 
           <h2>Cotizaciones ({listaCotizaciones.length})</h2>
+          {/*
+            Arrancar una cotizacion desde la ficha del cliente. El cotizador ya
+            sabe preseleccionar la organizacion con ?id_organizacion=, asi que
+            esto es solo el enlace: no duplica logica de seleccion de cliente.
+          */}
+          {puedeEditar && (
+            <p style={{ marginTop: 0 }}>
+              <Link href={`/cotizador?id_organizacion=${id}`} data-testid="org-nueva-cotizacion">
+                <button type="button">Nueva cotización para este cliente</button>
+              </Link>
+            </p>
+          )}
           <div className="tabla-contenedor">
             <table>
               <thead>
@@ -655,19 +682,37 @@ export default async function PaginaOrganizacion({
                   <th>Total</th>
                   <th>Emisión</th>
                   <th>Vencimiento</th>
+                  <th>PDF</th>
                   {puedeEditar && <th>Programar seguimiento</th>}
                 </tr>
               </thead>
               <tbody>
                 {listaCotizaciones.map((c) => (
                   <tr key={c.id_cotizacion}>
-                    <td>#{c.numero}</td>
+                    <td>
+                      <Link href={`/cotizador/${c.id_cotizacion}`} data-testid="org-cotizacion-link">
+                        #{c.numero}
+                      </Link>
+                    </td>
                     <td>
                       <span className="insignia neutra">{c.estado}</span>
                     </td>
                     <td className="num">{moneda(c.total)}</td>
                     <td>{fecha(c.fecha_emision)}</td>
                     <td>{fecha(c.fecha_vencimiento)}</td>
+                    {/*
+                      Enlace directo a la ruta que ya genera (y persiste) el PDF.
+                      Es un GET sin estado, por eso no necesita nada mas aca; el
+                      historial de PDFs ya generados vive en el detalle.
+                    */}
+                    <td>
+                      <a
+                        href={`/cotizador/${c.id_cotizacion}/pdf`}
+                        data-testid="org-cotizacion-pdf"
+                      >
+                        PDF
+                      </a>
+                    </td>
                     {puedeEditar && (
                       <td>
                         <form action={programarSeguimiento} className="form-inline">
@@ -682,7 +727,7 @@ export default async function PaginaOrganizacion({
                 ))}
                 {listaCotizaciones.length === 0 && (
                   <tr>
-                    <td colSpan={puedeEditar ? 6 : 5} style={{ color: "var(--texto-suave)" }}>
+                    <td colSpan={puedeEditar ? 7 : 6} style={{ color: "var(--texto-suave)" }}>
                       Sin cotizaciones registradas.
                     </td>
                   </tr>

@@ -1,0 +1,1121 @@
+/*
+ * Estilos de la calculadora visual de /cotizador.
+ *
+ * Todo va prefijado con .calcv2 a proposito: el HTML original usaba selectores
+ * globales (*, body, input[type=text]) que romperian el resto de la consola.
+ * Ademas globals.css ya define input/select/button con min-width y fondo de
+ * acento, asi que lo primero que hace este archivo es neutralizar esa herencia
+ * dentro del contenedor y recien despues aplicar el diseno.
+ */
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700;800&display=swap");
+
+.calcv2 {
+  --bg: #f5f3ee;
+  --card: #fff;
+  --card2: #faf9f7;
+  --border: #e2ddd6;
+  --ink: #1a1814;
+  --muted: #8a8580;
+  --green: #1a5c3a;
+  --green-l: #e8f3ed;
+  --amber: #b45309;
+  --amber-l: #fef3c7;
+  --blue: #1d4ed8;
+  --blue-l: #eff6ff;
+  --purple: #7c3aed;
+  --purple-l: #f5f3ff;
+  --red: #b91c1c;
+  --red-l: #fee2e2;
+
+  font-family: "Outfit", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 14px;
+  color-scheme: light;
+}
+
+.calcv2 * {
+  box-sizing: border-box;
+}
+
+/* Neutraliza globals.css dentro del contenedor.
+ * Va envuelto en :where() a proposito: asi la regla pesa lo mismo que un solo
+ * selector de clase y cualquier regla del diseno (que siempre lleva clase +
+ * tipo, o clase + atributo) la gana. Sin :where(), el :not() sumaba
+ * especificidad y este reset se comia el estilo de los inputs. */
+.calcv2 :where(input:not([type="checkbox"]):not([type="range"])),
+.calcv2 :where(select),
+.calcv2 :where(button) {
+  font: inherit;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font-weight: 400;
+}
+.calcv2 input[type="checkbox"] {
+  min-height: 0;
+  min-width: 0;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  accent-color: var(--green);
+}
+
+/* Contenedor: aprovecha el ancho real del escritorio en vez de dejar
+ * dos franjas vacias a los lados. */
+.calcv2 .wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+@media (min-width: 700px) {
+  .calcv2 {
+    padding: 22px 22px;
+  }
+}
+
+/* utilidades cortas (evitan un mar de style={{}} en el TSX) */
+.calcv2 .mb0 {
+  margin-bottom: 0;
+}
+.calcv2 .mb10 {
+  margin-bottom: 10px;
+}
+.calcv2 .mb12 {
+  margin-bottom: 12px;
+}
+.calcv2 .mb14 {
+  margin-bottom: 14px;
+}
+.calcv2 .mt6 {
+  margin-top: 6px;
+}
+.calcv2 .mt8 {
+  margin-top: 8px;
+}
+.calcv2 .mt10 {
+  margin-top: 10px;
+}
+.calcv2 .mt12 {
+  margin-top: 12px;
+}
+.calcv2 .f11 {
+  font-size: 11px;
+}
+.calcv2 .f12 {
+  font-size: 12px;
+}
+.calcv2 .izq {
+  text-align: left;
+  padding-left: 4px;
+}
+.calcv2 .mono {
+  text-align: center;
+  font-family: "DM Mono", ui-monospace, monospace;
+}
+.calcv2 .lbl {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.calcv2 .nota {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.calcv2 .sub-tit {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 8px 0 6px;
+}
+
+/* header */
+.calcv2 .cab {
+  margin-bottom: 22px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.calcv2 .eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.calcv2 .big-h1 {
+  font-size: clamp(24px, 4vw, 38px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: var(--ink);
+}
+.calcv2 .big-h1 em {
+  font-style: normal;
+  color: var(--green);
+}
+.calcv2 .subtitle {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 78ch;
+}
+
+/* card */
+.calcv2 .card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 14px;
+}
+.calcv2 .sec {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.calcv2 .sec-meta {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+.calcv2 .sec-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.calcv2 .icon-amber {
+  background: var(--amber-l);
+  color: var(--amber);
+}
+
+/* Dos columnas en escritorio para los bloques del pedido: aprovecha el ancho
+ * sin que ninguna tarjeta quede desproporcionada. */
+.calcv2 .cols2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  align-items: start;
+}
+@media (min-width: 1080px) {
+  .calcv2 .cols2 {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+.calcv2 .col-stack > .card:last-child {
+  margin-bottom: 14px;
+}
+
+/* inputs */
+.calcv2 input[type="text"],
+.calcv2 input[type="number"],
+.calcv2 select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--card2);
+  outline: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+  -moz-appearance: textfield;
+}
+.calcv2 input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+.calcv2 input:focus,
+.calcv2 select:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(26, 92, 58, 0.08);
+  background: #fff;
+}
+.calcv2 input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.calcv2 .mw {
+  position: relative;
+}
+.calcv2 .mw input {
+  padding-left: 22px;
+  font-family: "DM Mono", ui-monospace, SFMono-Regular, monospace;
+  text-align: right;
+}
+.calcv2 .mw::before {
+  content: "$";
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.calcv2 .pw {
+  position: relative;
+}
+.calcv2 .pw input {
+  padding-right: 22px;
+}
+.calcv2 .pw::after {
+  content: "%";
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* cost rows */
+.calcv2 .crow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px 30px;
+  gap: 7px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.calcv2 .crow-head {
+  margin-bottom: 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  padding-left: 4px;
+}
+.calcv2 .btn-del {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.calcv2 .btn-del:hover {
+  border-color: var(--red);
+  color: var(--red);
+  background: var(--red-l);
+}
+.calcv2 .btn-del:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.calcv2 .btn-del:disabled:hover {
+  border-color: var(--border);
+  color: var(--muted);
+  background: none;
+}
+.calcv2 .btn-add {
+  width: 100%;
+  padding: 8px;
+  border: 1.5px dashed var(--border);
+  border-radius: 9px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s;
+  margin-top: 4px;
+}
+.calcv2 .btn-add:hover {
+  border-color: var(--green);
+  color: var(--green);
+  background: var(--green-l);
+}
+.calcv2 .btn-add-big {
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--green);
+  border-color: var(--green);
+}
+
+/* range */
+.calcv2 input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+}
+.calcv2 input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--green);
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+.calcv2 input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--green);
+  cursor: pointer;
+  border: 2px solid #fff;
+}
+
+/* info boxes */
+.calcv2 .info {
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+.calcv2 .info-amber {
+  background: var(--amber-l);
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+.calcv2 .info-blue {
+  background: var(--blue-l);
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+}
+.calcv2 .info-green {
+  background: var(--green-l);
+  border: 1px solid #6ee7b7;
+  color: var(--green);
+}
+
+/* machines */
+.calcv2 .mach-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px 100px 30px;
+  gap: 7px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.calcv2 .mach-head {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* retenciones */
+.calcv2 .ret-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+@media (max-width: 760px) {
+  .calcv2 .ret-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.calcv2 .ret-box {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.calcv2 .ret-box label {
+  font-size: 12px;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 6px;
+}
+.calcv2 .ret-box small {
+  font-size: 11px;
+  color: #7ea8e8;
+  display: block;
+  margin-top: 2px;
+}
+
+/* ── margen deseado: bloque compacto, solo margen sobre venta ──────── */
+.calcv2 .margen-card {
+  background: var(--ink);
+  color: #fff;
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+}
+.calcv2 .margen-tit {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 10px;
+}
+.calcv2 .margen-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.calcv2 .margen-row input[type="range"] {
+  background: rgba(255, 255, 255, 0.15);
+  min-width: 180px;
+}
+.calcv2 .margen-row input[type="range"]::-webkit-slider-thumb {
+  background: #6ee7b7;
+  border-color: var(--ink);
+}
+.calcv2 .margen-num {
+  width: 86px;
+  flex-shrink: 0;
+}
+.calcv2 .margen-num input[type="number"] {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-family: "DM Mono", ui-monospace, monospace;
+  text-align: right;
+  padding-right: 22px;
+}
+.calcv2 .margen-num::after {
+  color: rgba(255, 255, 255, 0.45);
+}
+.calcv2 .margen-badge {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 18px;
+  color: #6ee7b7;
+  white-space: nowrap;
+}
+.calcv2 .margen-help {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.42);
+  margin-top: 9px;
+}
+
+/* ── resumen financiero ────────────────────────────────────────────── */
+.calcv2 .resumen {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 18px 18px;
+  margin-bottom: 14px;
+}
+.calcv2 .res-hero {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  align-items: center;
+  background: var(--green);
+  border-radius: 12px;
+  padding: 18px 20px;
+  color: #fff;
+}
+@media (min-width: 860px) {
+  .calcv2 .res-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  }
+}
+.calcv2 .hero-l {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 4px;
+}
+.calcv2 .hero-v {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: clamp(34px, 5vw, 52px);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+}
+.calcv2 .hero-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.62);
+  margin-top: 6px;
+}
+.calcv2 .hero-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 9px;
+}
+.calcv2 .tile {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.calcv2 .tile-ok {
+  background: rgba(110, 231, 183, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(110, 231, 183, 0.45);
+}
+.calcv2 .tile-l {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 3px;
+  line-height: 1.3;
+}
+.calcv2 .tile-v {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 19px;
+  color: #fff;
+}
+.calcv2 .tile-ok .tile-v {
+  color: #a7f3d0;
+}
+
+.calcv2 .res-cols {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+@media (min-width: 900px) {
+  .calcv2 .res-cols {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  }
+}
+.calcv2 .panel {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-top: 12px;
+}
+.calcv2 .res-cols > .panel {
+  margin-top: 0;
+}
+.calcv2 .panel-tit {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+/* desglose */
+.calcv2 .dg-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--ink);
+  border-bottom: 1px dashed var(--border);
+}
+.calcv2 .dg-row:last-child {
+  border-bottom: 0;
+}
+.calcv2 .dg-v {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.calcv2 .dg-total {
+  font-weight: 600;
+  border-top: 1px solid var(--border);
+  border-bottom: 0;
+  margin-top: 4px;
+  padding-top: 9px;
+}
+.calcv2 .dg-suma {
+  color: var(--green);
+  font-weight: 600;
+}
+.calcv2 .dg-resta {
+  color: var(--red);
+}
+.calcv2 .dg-ret {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* metricas */
+.calcv2 .met-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 9px;
+}
+.calcv2 .met {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.calcv2 .met-l {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 3px;
+  line-height: 1.3;
+}
+.calcv2 .met-v {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 17px;
+  color: var(--ink);
+}
+.calcv2 .met-nota {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+
+/* escenarios */
+.calcv2 .sc-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+@media (max-width: 620px) {
+  .calcv2 .sc-row {
+    grid-template-columns: 1fr;
+  }
+}
+.calcv2 .sc {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  padding: 12px 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+  width: 100%;
+}
+.calcv2 .sc:hover {
+  border-color: var(--green);
+}
+.calcv2 .sc.on {
+  border-color: var(--green);
+  background: var(--green-l);
+}
+.calcv2 .sc-t {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.calcv2 .sc-p {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 21px;
+  color: var(--ink);
+}
+.calcv2 .sc.on .sc-p {
+  color: var(--green);
+}
+.calcv2 .sc-d {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+/* preset btns */
+.calcv2 .presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.calcv2 .presets-tit {
+  font-size: 11px;
+  color: var(--muted);
+  width: 100%;
+  margin-bottom: 2px;
+}
+.calcv2 .pre-btn {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 5px 11px;
+  background: none;
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--muted);
+  transition: all 0.15s;
+}
+.calcv2 .pre-btn:hover {
+  border-color: var(--purple);
+  color: var(--purple);
+  background: var(--purple-l);
+}
+
+/* ── tarjetas de producto ──────────────────────────────────────────
+ * Cada linea es autocontenida: proveedor, producto, costo, cantidad,
+ * tecnica y costos adicionales, todo propio de ese producto. */
+.calcv2 .linea {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.calcv2 .linea-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.calcv2 .linea-num {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.calcv2 .linea-sub-mini {
+  margin-left: auto;
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--green);
+}
+/* proveedor | producto | costo | cantidad */
+.calcv2 .linea-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.3fr) 150px 120px;
+  gap: 9px;
+  align-items: end;
+}
+@media (max-width: 1000px) {
+  .calcv2 .linea-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+@media (max-width: 620px) {
+  .calcv2 .linea-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.calcv2 .linea-grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.calcv2 .linea-grid4 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 9px;
+  margin-bottom: 10px;
+}
+@media (max-width: 620px) {
+  .calcv2 .linea-grid2 {
+    grid-template-columns: 1fr;
+  }
+}
+.calcv2 .linea-tec {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.calcv2 .linea-tarifa {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+/* multipack: precio publicado del proveedor vs costo unitario usado */
+.calcv2 .pack-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 9px;
+  padding: 8px 11px;
+  border-radius: 9px;
+  background: var(--purple-l);
+  border: 1px solid #ddd6fe;
+  color: #5b21b6;
+  font-size: 12px;
+}
+.calcv2 .pack-sep {
+  color: #a78bfa;
+}
+.calcv2 .pack-nota {
+  width: 100%;
+  font-size: 11px;
+  color: #7c3aed;
+  opacity: 0.85;
+}
+
+/* costos adicionales del producto */
+.calcv2 .extras-box {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--card);
+}
+.calcv2 .extras-tit {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.calcv2 .extras-help {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 2px 0 9px;
+}
+
+/* costo + ganancia de la linea */
+.calcv2 .linea-total {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--green-l);
+  border: 1px solid #6ee7b7;
+  font-size: 12px;
+  color: var(--green);
+}
+.calcv2 .linea-total-desglose {
+  min-width: 0;
+}
+.calcv2 .linea-total-v {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.calcv2 .lt-costo {
+  color: var(--ink);
+}
+.calcv2 .lt-gan {
+  color: var(--green);
+}
+/* Precio de venta de la linea: lo que se le cobra al cliente. */
+.calcv2 .lt-precio {
+  color: var(--blue, #1d4ed8);
+  font-weight: 600;
+}
+
+/* combo de producto: un solo control por linea (buscar + elegir) */
+.calcv2 .cbx {
+  position: relative;
+}
+.calcv2 .cbx-list {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 3px);
+  left: 0;
+  right: 0;
+  min-width: 320px;
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 4px;
+}
+.calcv2 .cbx-op {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 9px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  background: none;
+  line-height: 1.35;
+}
+.calcv2 .cbx-op:hover {
+  background: var(--green-l);
+}
+.calcv2 .cbx-op.on {
+  background: var(--green-l);
+  font-weight: 600;
+}
+.calcv2 .cbx-nom {
+  font-weight: 500;
+}
+.calcv2 .cbx-cat {
+  color: var(--muted);
+  font-weight: 400;
+}
+.calcv2 .cbx-precio {
+  font-size: 11px;
+  color: var(--muted);
+}
+.calcv2 .cbx-op-limpiar {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  margin-bottom: 3px;
+}
+.calcv2 .cbx-vacio {
+  padding: 9px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* disenos DTF dentro de una linea */
+.calcv2 .dis-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 62px 62px 62px 88px 30px;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 7px;
+  padding: 7px 8px;
+  background: var(--card2);
+  border-radius: 8px;
+}
+.calcv2 .dis-row input {
+  font-size: 13px;
+}
+.calcv2 .dis-head {
+  background: none;
+  padding: 0 8px;
+  margin-bottom: 2px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  text-align: center;
+}
+.calcv2 .dis-area {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 12px;
+  text-align: center;
+  font-weight: 600;
+}
+.calcv2 .chk {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  align-self: end;
+  padding-bottom: 8px;
+}
+
+/* secciones plegables (tarifas, maquinas, retenciones) */
+.calcv2 .sum-plegable {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  list-style: revert;
+}
+.calcv2 .sum-valor {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-weight: 400;
+  color: var(--muted);
+}
+.calcv2 .tarifa-tit {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 14px 0 6px;
+}
+
+/* ── emision de la cotizacion real ─────────────────────────────────
+ * Esta tarjeta es la unica de la calculadora que ESCRIBE en la base, por eso
+ * se separa visualmente del bloque de estimacion con un borde acentuado. */
+.calcv2 .emitir-card {
+  border-color: var(--purple);
+  border-width: 1.5px;
+}
+.calcv2 .lista-problemas {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.calcv2 .lista-problemas li {
+  margin-bottom: 2px;
+}
+.calcv2 .btn-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.calcv2 .btn-add:disabled:hover {
+  border-color: var(--border);
+  color: var(--muted);
+  background: none;
+}
+.calcv2 .volumen-card {
+  background: #ffffff;
+  color: #172d26;
+  border: 1px solid #cad9d1;
+  border-radius: 14px;
+  padding: 20px;
+}
+.calcv2 .volumen-card h3 { margin: 0 0 12px; font-size: 18px; }
+.calcv2 .volumen-card p { line-height: 1.6; }
+.calcv2 .volumen-card table { min-width: 650px; width: 100%; }
+.calcv2 .volumen-card td { color: #172d26; }
+.calcv2 .volumen-card .tabla-contenedor { overflow-x: auto; }
+.calcv2 .volumen-card input[type="checkbox"] { width: auto; accent-color: #237554; }
+.calcv2 .linea-grid3 { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; margin: 14px 0; }
+.calcv2 .linea-grid3 label { display: block; line-height: 1.5; }
+.calcv2 .linea-grid3 input { margin-top: 6px; width: 100%; }
+.calcv2 .crow.costo-linea { display: grid; grid-template-columns: minmax(160px,1fr) minmax(110px,160px) minmax(140px,170px) 32px; gap: 8px; }
+.calcv2 .crow.costo-linea > * { min-width: 0; width: 100%; }
+@media (max-width: 700px) {
+  .calcv2 .linea-grid3 { grid-template-columns: 1fr; }
+  .calcv2 .crow.costo-linea { grid-template-columns: minmax(0,1fr) 32px; }
+  .calcv2 .crow.costo-linea > input { grid-column: 1 / -1; }
+  .calcv2 .crow.costo-linea > .mw { grid-column: 1 / -1; }
+}

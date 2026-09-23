@@ -29,6 +29,31 @@ type ProductoProveedor = {
 
 const cop = (v: number) => "$" + v.toLocaleString("es-CO", { maximumFractionDigits: 0 });
 
+const miles = (v: number) => v.toLocaleString("es-CO");
+
+/**
+ * Presentacion y costo unitario interno de una observacion de precio.
+ * Misma formula que el motor de cotizacion y que
+ * fn_consola_ofertas_producto_proveedor: mostrar solo "precio mas reciente"
+ * hace ver identico un producto de $18.000 la unidad y uno de $18.000 el
+ * paquete de 10, que cuestan 10 veces distinto por unidad.
+ */
+const desglosePrecio = (s: Snapshot) => {
+  const precio = Number(s.precio_publicado);
+  const pack = Number(s.cantidad_pack ?? NaN);
+  const esPack = s.unidad_compra === "PACK" && Number.isFinite(pack) && pack > 0;
+  const contenido = esPack ? pack : 1;
+  const unidadTexto =
+    s.unidad_compra === "METER"
+      ? "metro"
+      : s.unidad_compra === "SHEET"
+        ? "hoja"
+        : esPack
+          ? "paquete"
+          : "unidad";
+  return { esPack, contenido, unidadTexto, costoUnitario: esPack ? precio / pack : precio };
+};
+
 const insigniaCalidad = (estado: string) =>
   estado === "VALID" ? "insignia" : estado === "REJECTED" ? "insignia alerta" : "insignia aviso";
 
@@ -89,8 +114,9 @@ export default async function PaginaProveedor({
               <th>SKU proveedor</th>
               <th>Categoria</th>
               <th>Calidad</th>
-              <th className="num">Precio mas reciente</th>
-              <th>Unidad</th>
+              <th className="num">Precio proveedor</th>
+              <th className="num">Contenido</th>
+              <th className="num">Costo unitario interno</th>
               <th className="num">Observaciones</th>
               <th>Fuente</th>
             </tr>
@@ -130,10 +156,17 @@ export default async function PaginaProveedor({
                       {p.estado_calidad}
                     </span>
                   </td>
-                  <td className="num">
-                    {ultimo ? cop(ultimo.precio_publicado) : "sin precio"}
+                  <td className="num" data-testid="proveedor-precio">
+                    {ultimo
+                      ? `${cop(ultimo.precio_publicado)} / ${desglosePrecio(ultimo).unidadTexto}`
+                      : "sin precio"}
                   </td>
-                  <td>{ultimo?.unidad_compra ?? "—"}</td>
+                  <td className="num">
+                    {ultimo ? `${miles(desglosePrecio(ultimo).contenido)} und` : "—"}
+                  </td>
+                  <td className="num" data-testid="proveedor-costo-unitario">
+                    {ultimo ? `${cop(desglosePrecio(ultimo).costoUnitario)} / und` : "—"}
+                  </td>
                   <td className="num">{snaps.length}</td>
                   <td>
                     {p.url_producto ? (

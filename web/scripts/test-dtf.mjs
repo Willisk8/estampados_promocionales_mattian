@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import { estimarDtf } from '../src/lib/dtf.ts';
+const base = { anchoUtilCm: 58, permitirRotacion: true, separacionCm: 0, minimoMetros: 0, reservaPct: 0 };
+const run = (d, n = 1, o = {}) => estimarDtf([d], n, { ...base, ...o });
+assert.equal(run({ w: 60, h: 60, qty: 1 }).ok, false);
+assert.equal(run({ w: 60, h: 10, qty: 1 }).rotado, true);
+assert.equal(run({ w: 60, h: 10, qty: 1 }, 1, { permitirRotacion: false }).ok, false);
+assert.equal(run({ w: 60, h: 60, qty: 1 }, 1, { anchoUtilCm: 60 }).ok, true);
+assert.equal(run({ w: 20, h: 10, qty: 1 }, 12, { permitirRotacion: false }).metrosFacturables, .6);
+assert.equal(run({ w: 20, h: 10, qty: 1 }, 12, { permitirRotacion: false, separacionCm: 1 }).metrosFacturables, .65);
+assert.equal(run({ w: 20, h: 10, qty: 1 }, 12, { minimoMetros: 1 }).metrosFacturables, 1);
+assert.equal(run({ w: 20, h: 10, qty: 1 }, 12, { reservaPct: 10 }).repeticiones, 14);
+assert.equal(estimarDtf([{ w: 10, h: 20, qty: 1 }, { w: 5, h: 8, qty: 1 }], 1, base).ok, false);
+for (const bad of [0, -1, NaN, Infinity, 1.5]) assert.equal(run({ w: 10, h: 10, qty: 1 }, bad).ok, false);
+assert.equal(run({ w: -1, h: 10, qty: 1 }).ok, false);
+assert.equal(run({ w: 10, h: 10, qty: .5 }).ok, false);
+assert.equal(run({ w: 10, h: 10, qty: 1 }, Number.MAX_SAFE_INTEGER, { reservaPct: 100 }).ok, false);
+console.log('DTF: geometria, rotacion, filas, separacion, minimo, reserva e invalidos OK');

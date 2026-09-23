@@ -2,6 +2,11 @@
 
 Fecha de corte: 2026-08-25
 
+> Plan histórico. Para la implementación actual rige el
+> [plan de cotización por cliente del 19 de septiembre](plan-cotizador-por-cliente-2026-09-19.md).
+> El requisito de cinco productos propios y tablas de venta queda sustituido por
+> pruebas de escenarios sobre productos de cualquier proveedor, cotizados para cada cliente.
+
 Este plan organiza lo que falta después de cerrar la capa técnica base:
 migraciones, CRM, importación, contactabilidad, catálogo proveedor y costos de
 técnicas de marcación. El objetivo inmediato no es lanzar campañas; es dejar

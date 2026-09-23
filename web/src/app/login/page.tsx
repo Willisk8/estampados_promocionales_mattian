@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { crearClienteServidor } from "@/lib/supabase/servidor";
+import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
 import { rutaInternaSegura } from "@/lib/rutas-internas";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +10,9 @@ export default async function PaginaLogin({
   searchParams: Promise<{ error?: string; siguiente?: string }>;
 }) {
   const params = await searchParams;
+  const siguienteSeguro = rutaInternaSegura(params.siguiente, "/");
+  const sesion = await obtenerSesionConsola();
+  if (sesion) redirect(siguienteSeguro);
 
   async function iniciarSesion(formData: FormData) {
     "use server";
@@ -24,7 +27,9 @@ export default async function PaginaLogin({
     if (error) {
       // No se distingue "usuario inexistente" de "clave incorrecta": decirlo
       // permitiria enumerar cuentas validas.
-      redirect("/login?error=credenciales");
+      const falloServicio = !error.status || error.status >= 500;
+      const vuelta = new URLSearchParams({ error: falloServicio ? "servicio" : "credenciales", siguiente });
+      redirect(`/login?${vuelta.toString()}`);
     }
 
     redirect(siguiente);
@@ -40,9 +45,14 @@ export default async function PaginaLogin({
           Correo o contrasena incorrectos.
         </p>
       )}
+      {params.error === "servicio" && (
+        <p className="error-texto" role="alert">
+          No se pudo conectar con el servicio de acceso. Intenta de nuevo cuando este disponible.
+        </p>
+      )}
 
       <form action={iniciarSesion}>
-        <input type="hidden" name="siguiente" value={rutaInternaSegura(params.siguiente, "/")} />
+        <input type="hidden" name="siguiente" value={siguienteSeguro} />
         <input
           type="email"
           name="email"

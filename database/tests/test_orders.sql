@@ -4,6 +4,10 @@
 -- ============================================================
 
 BEGIN;
+-- Fixture-owner view verifies emitted events independently of console RLS.
+CREATE TEMP VIEW audit_quote_events AS SELECT * FROM public.cotizacion_evento;
+GRANT SELECT ON audit_quote_events TO authenticated;
+
 
 INSERT INTO auth.users (id, email) VALUES
     ('00000000-0000-4000-b200-000000000001', 'lectura-pedidos@prueba.local'),
@@ -184,7 +188,7 @@ BEGIN
     ASSERT v_estado_cotizacion = 'CONVERTIDA_A_PEDIDO', 'la cotizacion debe quedar CONVERTIDA_A_PEDIDO';
 
     SELECT count(*) INTO v_evento_conversion
-      FROM cotizacion_evento
+      FROM pg_temp.audit_quote_events
      WHERE id_cotizacion = '00000000-0000-4000-b200-000000000021'
        AND estado_nuevo = 'CONVERTIDA_A_PEDIDO';
     ASSERT v_evento_conversion = 1, 'la conversion debe dejar evento en cotizacion_evento';

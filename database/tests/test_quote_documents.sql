@@ -4,6 +4,10 @@
 -- ============================================================
 
 BEGIN;
+-- Fixture-owner view verifies emitted events independently of console RLS.
+CREATE TEMP VIEW audit_quote_events AS SELECT * FROM public.cotizacion_evento;
+GRANT SELECT ON audit_quote_events TO authenticated;
+
 
 INSERT INTO auth.users (id, email) VALUES
     ('00000000-0000-4000-a100-000000000001', 'lectura-docs@prueba.local'),
@@ -75,6 +79,8 @@ INSERT INTO cotizacion (
 );
 
 -- ----------------------------------------------------------
+INSERT INTO storage.objects(bucket_id,name) VALUES ('cotizaciones-pdf','cotizaciones/00000000-0000-4000-a100-000000000020/00000000-0000-4000-a100-000000000002/v1.pdf'), ('cotizaciones-pdf','cotizaciones/00000000-0000-4000-a100-000000000020/00000000-0000-4000-a100-000000000002/152-1756800000000.pdf');
+
 -- Vencimiento consultable
 -- ----------------------------------------------------------
 DO $$
@@ -143,15 +149,15 @@ DECLARE v_id_doc UUID; v_eventos INT;
 BEGIN
     SELECT id_cotizacion_documento INTO v_id_doc
       FROM fn_consola_registrar_documento_cotizacion(
-        '00000000-0000-4000-a100-000000000020', 'PDF_GENERADO', 'cotizaciones/2026/v1.pdf');
+        '00000000-0000-4000-a100-000000000020', 'PDF_GENERADO', 'cotizaciones/00000000-0000-4000-a100-000000000020/00000000-0000-4000-a100-000000000002/v1.pdf');
     ASSERT v_id_doc IS NOT NULL, 'debe registrar el PDF generado';
 
     PERFORM * FROM fn_consola_registrar_documento_cotizacion(
-        '00000000-0000-4000-a100-000000000020', 'PDF_ENVIADO', 'cotizaciones/2026/v1.pdf',
+        '00000000-0000-4000-a100-000000000020', 'PDF_ENVIADO', 'cotizaciones/00000000-0000-4000-a100-000000000020/00000000-0000-4000-a100-000000000002/v1.pdf',
         '00000000-0000-4000-a100-000000000011');
 
     SELECT count(*) INTO v_eventos
-      FROM cotizacion_evento
+      FROM pg_temp.audit_quote_events
      WHERE id_cotizacion = '00000000-0000-4000-a100-000000000020'
        AND tipo_evento IN ('PDF_GENERADO', 'PDF_ENVIADO');
     ASSERT v_eventos = 2, 'cada documento registrado debe dejar su evento';
@@ -247,6 +253,150 @@ BEGIN
      WHERE table_name = 'cotizacion_documento' AND column_name = 'storage_path';
     ASSERT v_tipo = 'text', 'storage_path debe ser TEXT (ruta), nunca un tipo binario';
     RAISE NOTICE 'PASSED - cotizacion_documento guarda ruta, no contenido';
+END;
+$$;
+
+-- ----------------------------------------------------------
+-- 076: bucket de Storage y metadata del documento
+-- ----------------------------------------------------------
+RESET ROLE;
+
+-- El bucket donde vive el PDF: privado y solo application/pdf. Si dejara de
+-- ser privado, un PDF con precios y datos de cliente quedaria expuesto a
+-- cualquiera con la URL.
+DO $$
+DECLARE v_pub BOOLEAN; v_mime TEXT[];
+BEGIN
+    SELECT public, allowed_mime_types INTO v_pub, v_mime
+      FROM storage.buckets WHERE id = 'cotizaciones-pdf';
+    ASSERT FOUND, 'el bucket cotizaciones-pdf debe existir (migracion 076)';
+    ASSERT v_pub IS FALSE, 'cotizaciones-pdf debe ser PRIVADO';
+    ASSERT v_mime = ARRAY['application/pdf'], 'cotizaciones-pdf solo acepta application/pdf';
+    RAISE NOTICE 'PASSED - bucket cotizaciones-pdf privado y restringido a PDF';
+END;
+$$;
+
+DO $$
+DECLARE v_n INT;
+BEGIN
+    SELECT count(*) INTO v_n FROM pg_policies
+     WHERE schemaname = 'storage' AND tablename = 'objects'
+       AND policyname IN ('consola_lee_cotizaciones_pdf',
+                          'consola_escribe_cotizaciones_pdf',
+                          'cotizaciones_pdf_inmutables');
+    ASSERT v_n = 3, format('faltan policies de storage para cotizaciones-pdf: %s de 3', v_n);
+    RAISE NOTICE 'PASSED - policies de storage para cotizaciones-pdf';
+END;
+$$;
+
+-- Una sola version de la funcion: una sobrecarga dejaria ambiguas las
+-- llamadas de 3 y 4 argumentos que hace el resto de este archivo.
+DO $$
+DECLARE v_n INT; v_args TEXT;
+BEGIN
+    SELECT count(*) INTO v_n
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public'
+       AND p.proname = 'fn_consola_registrar_documento_cotizacion';
+    ASSERT v_n = 1, format('debe existir exactamente 1 funcion, hay %s (sobrecarga ambigua)', v_n);
+
+    SELECT pg_get_function_arguments(p.oid) INTO v_args
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public'
+       AND p.proname = 'fn_consola_registrar_documento_cotizacion';
+    ASSERT v_args LIKE '%p_metadata jsonb DEFAULT%',
+        format('la firma debe terminar en p_metadata: %s', v_args);
+    RAISE NOTICE 'PASSED - firma unica con p_metadata al final';
+END;
+$$;
+
+SELECT set_config('request.jwt.claims',
+                  '{"sub":"00000000-0000-4000-a100-000000000002"}', true);
+SET LOCAL ROLE authenticated;
+
+DO $$
+DECLARE v_id UUID; v_meta JSONB; v_rol TEXT; v_por UUID; v_evt JSONB;
+BEGIN
+    SELECT id_cotizacion_documento INTO v_id
+      FROM fn_consola_registrar_documento_cotizacion(
+        '00000000-0000-4000-a100-000000000020',
+        'PDF_GENERADO',
+        'cotizaciones/00000000-0000-4000-a100-000000000020/00000000-0000-4000-a100-000000000002/152-1756800000000.pdf',
+        NULL,
+        '{"numero": 152, "bytes": 41234}'::jsonb);
+    ASSERT v_id IS NOT NULL, 'debe registrar el documento con metadata';
+
+    SELECT metadata, rol_consola, generado_por INTO v_meta, v_rol, v_por
+      FROM cotizacion_documento WHERE id_cotizacion_documento = v_id;
+    ASSERT v_meta->>'numero' = '152', format('metadata no persistida: %s', v_meta);
+    ASSERT v_meta->>'bytes' = '41234', 'bytes debe quedar en metadata';
+    ASSERT v_rol = 'COMERCIAL', format('rol_consola sale de fn_consola_rol(), es %s', v_rol);
+    ASSERT v_por = '00000000-0000-4000-a100-000000000002',
+        'generado_por debe ser auth.uid(), no un parametro';
+
+    SELECT metadata INTO v_evt FROM pg_temp.audit_quote_events
+     WHERE id_cotizacion = '00000000-0000-4000-a100-000000000020'
+       AND metadata->>'id_cotizacion_documento' = v_id::text;
+    ASSERT v_evt->>'numero' = '152', format('el evento debe llevar la metadata: %s', v_evt);
+    RAISE NOTICE 'PASSED - metadata se persiste en el documento y en su evento';
+END;
+$$;
+
+-- metadata tiene que ser un objeto: un array o un escalar romperia a quien
+-- despues la lea por clave.
+DO $$
+DECLARE v_bloqueada BOOLEAN := false;
+BEGIN
+    BEGIN
+        PERFORM * FROM fn_consola_registrar_documento_cotizacion(
+            '00000000-0000-4000-a100-000000000020', 'PDF_GENERADO',
+            'cotizaciones/metadata-invalida.pdf', NULL, '[1,2]'::jsonb);
+    EXCEPTION WHEN OTHERS THEN
+        v_bloqueada := true;
+    END;
+    ASSERT v_bloqueada, 'un metadata que no es objeto jsonb debe rechazarse';
+    RAISE NOTICE 'PASSED - metadata debe ser un objeto jsonb';
+END;
+$$;
+
+-- La RLS de la tabla sigue negando el INSERT directo: la unica via es la
+-- funcion SECURITY DEFINER.
+DO $$
+DECLARE v_bloqueada BOOLEAN := false;
+BEGIN
+    BEGIN
+        INSERT INTO cotizacion_documento (
+            id_cotizacion, tipo_documento, storage_path, generado_por, rol_consola
+        ) VALUES (
+            '00000000-0000-4000-a100-000000000020', 'PDF_GENERADO', 'directo.pdf',
+            '00000000-0000-4000-a100-000000000002', 'COMERCIAL');
+    EXCEPTION WHEN OTHERS THEN
+        v_bloqueada := true;
+    END;
+    ASSERT v_bloqueada, 'el INSERT directo en cotizacion_documento debe seguir bloqueado';
+    RAISE NOTICE 'PASSED - INSERT directo en cotizacion_documento sigue denegado';
+END;
+$$;
+
+RESET ROLE;
+
+-- LECTURA sigue sin poder registrar, tampoco pasando metadata.
+SELECT set_config('request.jwt.claims',
+                  '{"sub":"00000000-0000-4000-a100-000000000001"}', true);
+SET LOCAL ROLE authenticated;
+
+DO $$
+DECLARE v_bloqueada BOOLEAN := false;
+BEGIN
+    BEGIN
+        PERFORM * FROM fn_consola_registrar_documento_cotizacion(
+            '00000000-0000-4000-a100-000000000020', 'PDF_GENERADO',
+            'cotizaciones/lectura.pdf', NULL, '{"a":1}'::jsonb);
+    EXCEPTION WHEN OTHERS THEN
+        v_bloqueada := true;
+    END;
+    ASSERT v_bloqueada, 'LECTURA no debe poder registrar documentos ni con metadata';
+    RAISE NOTICE 'PASSED - LECTURA sigue bloqueada con la firma nueva';
 END;
 $$;
 

@@ -13,12 +13,21 @@ from scripts.data_quality.normalization import (  # noqa: E402
     normalize_email,
     normalize_nit,
     normalize_text,
+    normalize_url,
     search_key,
 )
 from scripts.data_quality.audit_datasets import Issues  # noqa: E402
 
 
 class ColombiaDataQualityTests(unittest.TestCase):
+    def test_invalid_url_port_and_host_do_not_abort_audit(self):
+        for value in ('https://example.com:abc', 'https://example.com:70000',
+                      'https://' + 'a' * 64 + '.com'):
+            with self.subTest(value=value):
+                self.assertEqual(normalize_url(value)[1], 'INVALID_FORMAT')
+        self.assertEqual(normalize_url('https://EXAMPLE.com:443/catalogo'),
+                         ('https://example.com/catalogo', 'VALID'))
+
     def test_issue_status_contract_uses_valid_review_required_invalid(self):
         issues = Issues()
 
@@ -35,6 +44,8 @@ class ColombiaDataQualityTests(unittest.TestCase):
         self.assertEqual(search_key("Organización Única"), "organizacion_unica")
 
     def test_fixed_prefixes_exclude_603(self):
+        self.assertEqual(normalize_colombian_phone('06-01 2345678').national_number, '6012345678')
+        self.assertEqual(normalize_colombian_phone('+57 601 2345678 ext 12').extension, '12')
         self.assertEqual(normalize_colombian_phone("+57 601 234 5678").classification, "FIJO")
         self.assertEqual(normalize_colombian_phone("608 234 5678").classification, "FIJO")
         result = normalize_colombian_phone("603 234 5678")

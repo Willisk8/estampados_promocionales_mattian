@@ -17,10 +17,11 @@ jobs:
   database-tests:
     name: Database migrations and tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     services:
       postgres:
-        image: postgres:16
+        image: postgres:17
         env:
           POSTGRES_DB: estampados_test
           POSTGRES_PASSWORD: postgres
@@ -100,6 +101,36 @@ jobs:
       # ejecuta antes de que exista ninguna migracion en la base.
       - name: Run AI evals (Cliente 360)
         run: python -m unittest scripts.evals.run_evals -v
+
+      - name: Set up Node for browser regressions
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install browser test dependencies
+        working-directory: web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run visual and SQL integration regressions
+        working-directory: web
+        timeout-minutes: 5
+        env:
+          QA_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/estampados_test
+          QA_OUTPUT_DIR: outputs/qa-ci
+        run: npm run test:ui
+
+      - name: Preserve browser screenshots and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-regressions
+          path: outputs/qa-ci/
+          if-no-files-found: warn
+          retention-days: 14
 
   frontend-checks:
     name: Frontend and static checks

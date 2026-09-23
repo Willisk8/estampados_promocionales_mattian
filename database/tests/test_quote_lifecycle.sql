@@ -4,6 +4,10 @@
 -- ============================================================
 
 BEGIN;
+-- Fixture-owner view verifies emitted events independently of console RLS.
+CREATE TEMP VIEW audit_quote_events AS SELECT * FROM public.cotizacion_evento;
+GRANT SELECT ON audit_quote_events TO authenticated;
+
 
 INSERT INTO auth.users (id, email) VALUES
     ('00000000-0000-4000-e000-000000000001', 'lectura-ciclo@prueba.local'),
@@ -90,7 +94,7 @@ DO $$
 DECLARE v_bloqueada BOOLEAN := false;
 BEGIN
     BEGIN
-        DELETE FROM cotizacion_evento
+        DELETE FROM pg_temp.audit_quote_events
          WHERE id_cotizacion_evento = '00000000-0000-4000-e000-000000000030';
     EXCEPTION WHEN OTHERS THEN
         v_bloqueada := true;
@@ -181,7 +185,7 @@ BEGIN
     ASSERT v_fecha_envio IS NOT NULL, 'la transicion a ENVIADA debe sellar fecha_envio';
 
     SELECT count(*) INTO v_eventos
-      FROM cotizacion_evento e
+      FROM pg_temp.audit_quote_events e
      WHERE e.id_cotizacion = '00000000-0000-4000-e000-000000000020'
        AND e.tipo_evento = 'TRANSICION_ESTADO'
        AND e.estado_anterior = 'EMITIDA'

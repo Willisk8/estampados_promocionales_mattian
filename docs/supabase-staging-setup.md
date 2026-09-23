@@ -1,5 +1,10 @@
 # Configuración de Supabase STAGING
 
+> **Guía histórica, sustituida el 2026-09-11.** Para recuperar o configurar el
+> proyecto existente sigue [Recuperar y verificar Supabase](supabase-recuperacion-y-verificacion.md).
+> No ejecutes la lista parcial ni el ejemplo de RLS de esta guía: hay migraciones
+> posteriores y una consulta como `postgres` no verifica los permisos de `anon`.
+
 ## Prerrequisitos
 - Cuenta en supabase.com (plan Free es suficiente para STAGING)
 - psql instalado localmente, o acceso al SQL Editor de Supabase

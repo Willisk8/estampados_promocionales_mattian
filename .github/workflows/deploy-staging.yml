@@ -1,44 +1,106 @@
 name: Deploy Staging
 
 on:
-  push:
-    branches:
-      - staging
-    paths:
-      - 'database/migrations/**.sql'
-      - 'database/tests/**.sql'
-      - 'scripts/*.ps1'
-      - '.github/workflows/deploy-staging.yml'
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [staging]
   workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
 
 jobs:
   migrate:
     name: Apply pending migrations
+    if: >-
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/staging')
     runs-on: ubuntu-latest
-
-    env:
-      DATABASE_URL: ${{ secrets.SUPABASE_STAGING_DATABASE_URL }}
+    timeout-minutes: 20
+    environment: staging
 
     steps:
+      - name: Require successful staging CI for the exact current commit
+        id: candidate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const automatic = context.eventName === 'workflow_run';
+            const trigger = context.payload.workflow_run;
+            if (automatic && (trigger.event !== 'push' || trigger.head_branch !== 'staging' ||
+                trigger.head_repository?.full_name !== `${owner}/${repo}`)) {
+              throw new Error('Only CI from a staging push in this repository can be promoted.');
+            }
+            const sha = automatic ? trigger.head_sha : context.sha;
+            const branch = await github.rest.repos.getBranch({ owner, repo, branch: 'staging' });
+            if (branch.data.commit.sha !== sha) {
+              throw new Error('Candidate is no longer the current staging commit.');
+            }
+            const { data } = await github.rest.actions.listWorkflowRuns({
+              owner, repo, workflow_id: 'ci.yml', branch: 'staging',
+              event: 'push', head_sha: sha, per_page: 100
+            });
+            const latest = data.workflow_runs
+              .filter(run => run.head_sha === sha && run.head_repository?.full_name === `${owner}/${repo}`)
+              .sort((a, b) => b.id - a.id)[0];
+            if (!latest || latest.status !== 'completed' || latest.conclusion !== 'success') {
+              throw new Error('The latest push CI for this exact staging SHA must have completed successfully.');
+            }
+            core.setOutput('sha', sha);
+
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.candidate.outputs.sha }}
+          persist-credentials: false
 
       - name: Install psql client
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y postgresql-client
 
-      - name: Validate staging database secret
+      - name: Validate the configured Supabase project without exposing credentials
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_STAGING_DATABASE_URL }}
         run: |
-          if [ -z "${DATABASE_URL:-}" ]; then
-            echo "Missing GitHub Actions secret: SUPABASE_STAGING_DATABASE_URL"
-            exit 1
-          fi
+          python3 - <<'PY'
+          import os
+          from urllib.parse import parse_qs, unquote, urlsplit
+          ref = 'psereyjwjpyakkmnabgm'
+          try:
+              db = urlsplit(os.environ.get('DATABASE_URL', ''))
+              host = (db.hostname or '').lower()
+              user = unquote(db.username or '')
+              direct = host == f'db.{ref}.supabase.co' and user == 'postgres'
+              pooler = host.endswith('.pooler.supabase.com') and user == f'postgres.{ref}'
+              valid = (db.scheme in ('postgres', 'postgresql') and
+                       (direct or pooler) and bool(db.password) and
+                       db.path == '/postgres' and db.port in (None, 5432, 6543) and
+                       not db.fragment and
+                       set(parse_qs(db.query, keep_blank_values=True)) <=
+                       {'sslmode', 'channel_binding', 'connect_timeout', 'application_name'})
+          except (ValueError, TypeError):
+              valid = False
+          if not valid:
+              raise SystemExit('Database secret is missing or does not identify the approved Supabase project.')
+          print('Approved Supabase project connection verified; credentials not logged.')
+          PY
 
       - name: Apply pending migrations
         shell: pwsh
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_STAGING_DATABASE_URL }}
         run: ./scripts/apply_pending_migrations.ps1
 
       - name: Run database tests
         shell: pwsh
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_STAGING_DATABASE_URL }}
         run: ./scripts/run_db_tests.ps1 -ConfirmStaging

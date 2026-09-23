@@ -151,8 +151,11 @@ def normalize_url(value: object | None) -> tuple[str, str]:
         return text, "INVALID_FORMAT"
     if parts.scheme.lower() not in {"http", "https"} or not parts.hostname:
         return text, "INVALID_FORMAT"
-    host = parts.hostname.encode("idna").decode("ascii").lower()
-    port = parts.port
+    try:
+        host = parts.hostname.encode("idna").decode("ascii").lower()
+        port = parts.port
+    except (UnicodeError, ValueError):
+        return text, "INVALID_FORMAT"
     netloc = host
     if port and not ((parts.scheme.lower() == "http" and port == 80) or (parts.scheme.lower() == "https" and port == 443)):
         netloc += f":{port}"
@@ -180,6 +183,9 @@ def normalize_colombian_phone(value: object | None) -> PhoneResult:
     elif len(digits) == 12 and digits.startswith("03"):
         digits = digits[2:]
         issue = "LEGACY_03_REMOVED"
+    if re.fullmatch(r"060[1245678][0-9]{7}", digits):
+        digits = digits[1:]
+        issue = "EXTRA_ZERO_BEFORE_FIXED_PREFIX"
 
     prefix = digits[:3]
     if len(digits) == 10 and prefix in FIXED_PREFIXES:

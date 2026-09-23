@@ -6,6 +6,19 @@ Base de datos y pipeline de datos para una plataforma comercial de productos pro
 
 ## Estado actual
 
+**Actualización del 23 de septiembre de 2026:** el [plan del cotizador por cliente](docs/plan-cotizador-por-cliente-2026-09-19.md)
+sustituye la tarea de cerrar cinco productos propios. Las migraciones 085–086 y
+la interfaz nueva están verificadas solo en PostgreSQL local; Supabase remoto
+sigue en 084 y el flujo nuevo requiere promoción controlada. El cuadro siguiente conserva el
+corte histórico anterior. El estado verificado más reciente está en
+[revisión del plan y producción](docs/revision-plan-y-produccion-2026-09-18.md)
+y [contactos, residenciales y CI](docs/contactos-residenciales-y-ci-2026-09-18.md).
+Supabase remoto registra 85 migraciones (`000`–`084`), 13.589 organizaciones
+y 17.503 canales. Propiedad horizontal ya fue importada con registros ambiguos
+en revisión. Las nuevas pruebas visuales están configuradas en el checkout;
+su ejecución en GitHub está pendiente de publicación. La aplicación local usa
+la base remota real; la denominación STAGING no acredita separación de producción.
+
 | Componente | Estado | Detalle |
 |---|---|---|
 | Infraestructura Supabase STAGING | ✓ Completo | Proyecto `psereyjwjpyakkmnabgm`, región us-west-2 Oregon |
@@ -458,7 +471,7 @@ Plan maestro: [`docs/plan_trabajo_cierre_mvp.md`](docs/plan_trabajo_cierre_mvp.m
 | Alta | Hacer commit atómico y sincronizar rama `staging` con migraciones `000`–`074`, seeds/tests/helpers requeridos y documentación; verificar STAGING real antes de afirmar despliegue |
 | Alta | Curar costos de técnicas de marcación para definir cuáles alimentan cálculo automático |
 | Alta | Ajustar la calculadora para usar costos versionados de proveedor y marcación |
-| Alta | Cerrar 5 productos propios MVP y probar `resolve_price()` de punta a punta |
+| Alta | Cerrar el cotizador interno por cliente y sus pruebas reales Auth/PDF/Storage según el plan actualizado |
 | Alta | Corregir o invalidar los 58 emails en cuarentena (`REVIEW_REQUIRED`) |
 | Alta | Segmentar emails corporativos/rol/personales y no activar personales scrapeados sin consentimiento o base legal documentada |
 | Alta | No habilitar campañas hasta cambiar contactabilidad de `DESCONOCIDA` a base válida |

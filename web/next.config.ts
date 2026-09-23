@@ -3,6 +3,11 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
+  // En desarrollo Next inicializa por defecto en `localhost`, pero a veces el
+  // navegador entra por `127.0.0.1` o por la IP de red que imprime `next dev`.
+  // Permitimos esos origenes para evitar warnings/bloqueos de recursos dev.
+  allowedDevOrigins: ["127.0.0.1", "192.168.1.5"],
+
   // Un `next build` normal sobrescribe el .next que `next dev` esta usando, y
   // el servidor de desarrollo se queda sirviendo rutas de CSS que ya no
   // existen: la pagina carga los datos pero sin ningun estilo. Con esto,

@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
+import { cotizacionParaModificar } from "@/lib/cotizacion-origen";
 import { SinAcceso } from "@/componentes/sin-acceso";
+import { CalculadoraCotizador } from "@/componentes/calculadora-cotizador";
+import SelectAutoSubmit from "@/componentes/select-auto-submit";
 import {
   crearProductoProveedorManual,
   crearCotizacionProveedor,
@@ -178,60 +181,129 @@ export default async function PaginaCotizador({
     canal_origen: string | null;
   }>;
 
-  let productosProveedor: ProductoProveedor[] = [];
-  if (sp.id_proveedor) {
-    const { data } = await supabase.rpc("fn_consola_buscar_productos_proveedor", {
-      p_id_proveedor: sp.id_proveedor,
-      p_q: sp.q_producto ?? null,
-      p_limit: 120,
-    });
-    productosProveedor = (data ?? []) as ProductoProveedor[];
-  }
+  // Consultas derivadas: dependen solo de searchParams, por lo que se resuelven
+  // en paralelo (evita 4 round-trips seriales hacia Supabase en cada render).
+  const productosPromise = sp.id_proveedor
+    ? supabase
+        .rpc("fn_consola_buscar_productos_proveedor", {
+          p_id_proveedor: sp.id_proveedor,
+          p_q: sp.q_producto ?? null,
+          p_limit: 120,
+        })
+        .then((r) => (r.data ?? []) as ProductoProveedor[])
+    : Promise.resolve([] as ProductoProveedor[]);
 
-  let ofertas: OfertaProveedor[] = [];
-  if (sp.id_producto_proveedor) {
-    const { data } = await supabase.rpc("fn_consola_ofertas_producto_proveedor", {
-      p_id_producto_proveedor: sp.id_producto_proveedor,
-      p_cantidad: Number.isFinite(cantidad) && cantidad > 0 ? cantidad : 1,
-    });
-    ofertas = (data ?? []) as OfertaProveedor[];
-  }
+  const ofertasPromise = sp.id_producto_proveedor
+    ? supabase
+        .rpc("fn_consola_ofertas_producto_proveedor", {
+          p_id_producto_proveedor: sp.id_producto_proveedor,
+          p_cantidad: Number.isFinite(cantidad) && cantidad > 0 ? cantidad : 1,
+        })
+        .then((r) => (r.data ?? []) as OfertaProveedor[])
+    : Promise.resolve([] as OfertaProveedor[]);
 
-  let tecnicas: TecnicaSnapshot[] = [];
-  if (Number.isFinite(cantidad) && cantidad > 0) {
-    const { data } = await supabase.rpc("fn_consola_buscar_snapshots_tecnica_marcacion", {
-      p_q: sp.q_tecnica ?? null,
-      p_cantidad: cantidad,
-      p_moneda: "COP",
-      p_limit: 80,
-    });
-    tecnicas = (data ?? []) as TecnicaSnapshot[];
-  }
+  const tecnicasPromise =
+    Number.isFinite(cantidad) && cantidad > 0
+      ? supabase
+          .rpc("fn_consola_buscar_snapshots_tecnica_marcacion", {
+            p_q: sp.q_tecnica ?? null,
+            p_cantidad: cantidad,
+            p_moneda: "COP",
+            p_limit: 80,
+          })
+          .then((r) => (r.data ?? []) as TecnicaSnapshot[])
+      : Promise.resolve([] as TecnicaSnapshot[]);
 
   const mostrarPreview =
     sp.previsualizar_proveedor === "1" &&
     !!sp.id_precio_proveedor_snapshot &&
     Number.isFinite(cantidad) &&
     cantidad > 0;
+  const snapshotPreview = mostrarPreview ? sp.id_precio_proveedor_snapshot : null;
 
-  let previewFilas: ComponentePreview[] = [];
-  if (mostrarPreview) {
-    const { data } = await supabase.rpc("fn_consola_previsualizar_cotizacion_proveedor", {
-      p_id_precio_proveedor_snapshot: sp.id_precio_proveedor_snapshot,
-      p_cantidad: cantidad,
-      p_marking_lines: buildMarkingLines(sp),
-      p_transporte_total: Number(sp.transporte_total ?? 0),
-      p_transport_mode: sp.transport_mode ?? "SEPARATE_LINE",
-      p_policy_code: "MVP_DEFAULT",
-      p_margen_override_pct: sp.margen_override_pct ? Number(sp.margen_override_pct) : null,
-    });
-    previewFilas = (data ?? []) as ComponentePreview[];
-  }
+  const previewPromise = snapshotPreview
+    ? supabase
+        .rpc("fn_consola_previsualizar_cotizacion_proveedor", {
+          p_id_precio_proveedor_snapshot: snapshotPreview,
+          p_cantidad: cantidad,
+          p_marking_lines: buildMarkingLines(sp),
+          p_transporte_total: Number(sp.transporte_total ?? 0),
+          p_transport_mode: sp.transport_mode ?? "SEPARATE_LINE",
+          p_policy_code: "MVP_DEFAULT",
+          p_margen_override_pct: sp.margen_override_pct
+            ? Number(sp.margen_override_pct)
+            : null,
+        })
+        .then((r) => (r.data ?? []) as ComponentePreview[])
+    : Promise.resolve([] as ComponentePreview[]);
+
+  const [productosProveedor, ofertas, tecnicas, previewFilas] = await Promise.all([
+    productosPromise,
+    ofertasPromise,
+    tecnicasPromise,
+    previewPromise,
+  ]);
 
   const previewOk = previewFilas.length > 0 && previewFilas.every((f) => f.status === "OK");
   const previewTotal = previewOk
     ? previewFilas.reduce((acc, f) => acc + Number(f.precio_resultante ?? 0), 0)
     : null;
+
+  // ── MODIFICAR UNA COTIZACION YA EMITIDA ─────────────────────────────
+  // `cotizacion` es inmutable (RLS deny_update, migracion 029). "Modificar" no
+  // edita nada: relee los snapshots congelados del original y precarga la
+  // calculadora para emitir una cotizacion NUEVA, con numero propio. Solo se
+  // hace para ADMIN porque es el unico rol que ve la calculadora.
+  const origen =
+    esAdmin && sp.desde_cotizacion
+      ? await cotizacionParaModificar(sp.desde_cotizacion)
+      : null;
+
+  // Nota sugerida, EDITABLE: deja la trazabilidad a la vista del cliente en el
+  // PDF sin inventar una columna de esquema para la referencia.
+  const notasIniciales = origen
+    ? `Ajusta a cotización #${origen.numero} por solicitud del cliente.`
+    : "";
+
+  // El selector de proveedor de cada linea se llena con `proveedores`, que la
+  // RPC topea en 80 filas. Si el proveedor de una linea precargada no cayo en
+  // ese tope, el <select> se veria vacio aunque el estado tenga el id correcto.
+  // Se agregan los que falten a partir del snapshot del propio item.
+  const proveedoresCalculadora: Proveedor[] = [...proveedores];
+  if (origen) {
+    for (const linea of origen.lineas) {
+      if (!linea.idProveedor) continue;
+      if (proveedoresCalculadora.some((p) => p.id_proveedor === linea.idProveedor)) continue;
+      proveedoresCalculadora.push({
+        id_proveedor: linea.idProveedor,
+        nombre: linea.nombreProveedor || "Proveedor de la cotización original",
+        ciudad: null,
+        productos: 0,
+      });
+    }
+  }
+
+  // Cliente preseleccionado: al modificar una cotizacion se hereda el de la
+  // original; si no, el que llega desde /organizaciones/[id].
+  const idOrganizacionPreseleccionada = origen?.id_organizacion ?? sp.id_organizacion ?? "";
+
+  // MISMO PROBLEMA QUE CON LOS PROVEEDORES, Y AQUI MUERDE MAS: la lista de
+  // organizaciones se topea en 120 filas ordenadas por nombre_legal y STAGING
+  // tiene ~1.000. Un cliente que no cae en ese tope deja el <select> en blanco
+  // aunque el id sea correcto, en los dos flujos de esta pagina. Se trae esa
+  // organizacion puntual (una consulta extra, solo cuando hace falta).
+  const organizacionesCotizador: Organizacion[] = [...organizaciones];
+  if (
+    idOrganizacionPreseleccionada &&
+    !organizacionesCotizador.some((o) => o.id_organizacion === idOrganizacionPreseleccionada)
+  ) {
+    const { data: orgFaltante } = await supabase
+      .from("organizacion")
+      .select("id_organizacion, nombre_legal, nit")
+      .eq("id_organizacion", idOrganizacionPreseleccionada)
+      .maybeSingle();
+    if (orgFaltante) organizacionesCotizador.unshift(orgFaltante as Organizacion);
+  }
 
   const productoSeleccionado = productosProveedor.find(
     (p) => p.id_producto_proveedor === sp.id_producto_proveedor
@@ -239,12 +311,32 @@ export default async function PaginaCotizador({
   const ofertaSeleccionada = ofertas.find((o) => o.id_snapshot === sp.id_precio_proveedor_snapshot);
   const tecnicaSeleccionada = tecnicas.find((t) => t.id_snapshot === sp.id_snapshot_tecnica);
 
+  // `id_organizacion` NO cuenta como "flujo en uso": ahora tambien llega desde
+  // /organizaciones/[id] para preseleccionar el cliente EN LA CALCULADORA, y no
+  // tiene sentido desplegar el flujo server-rendered por eso. Cualquier uso real
+  // del flujo de abajo trae ademas id_proveedor y compania.
+  const flujoEnUso = [
+    "id_proveedor",
+    "q_proveedor",
+    "q_producto",
+    "id_producto_proveedor",
+    "id_precio_proveedor_snapshot",
+    "cantidad",
+    "q_tecnica",
+    "id_snapshot_tecnica",
+    "previsualizar_proveedor",
+    "status",
+    "error",
+    "ok",
+  ].some((clave) => Boolean(sp[clave]));
+
   return (
     <>
       <h1>Cotizador</h1>
       <p className="subtitulo">
-        Flujo proveedor-first: cliente, proveedor, producto, costo real, tecnica,
-        preview y cotizacion auditable.
+        Arriba, la calculadora visual: estima el precio en vivo con el costo real del
+        producto del proveedor. Abajo, el flujo proveedor-first que emite la cotizacion
+        auditable y su PDF.
       </p>
 
       {sp.status && (
@@ -264,26 +356,74 @@ export default async function PaginaCotizador({
         </div>
       )}
 
-      <form action={previsualizarCotizacionProveedor}>
+      {sp.desde_cotizacion && esAdmin && !origen && (
+        <div className="aviso-caja" data-testid="cotizador-origen-error">
+          No se pudo cargar la cotización de origen: no existe o ninguna de sus
+          líneas tiene la observación de precio del proveedor que hace falta para
+          volver a emitirla.
+        </div>
+      )}
+
+      {origen && (
+        <div className="aviso-caja neutro" data-testid="cotizador-origen-aviso">
+          Estás ajustando la <a href={`/cotizador/${origen.id_cotizacion}`}>cotización #{origen.numero}</a>:
+          se cargaron {origen.lineas.length} línea(s) con sus cantidades y costos originales.
+          {origen.omitidas > 0
+            ? ` ${origen.omitidas} línea(s) del original no se pudieron cargar por falta de observación de precio.`
+            : ""}{" "}
+          La #{origen.numero} no se modifica: al emitir se crea una cotización
+          nueva con número propio. Los parámetros físicos de la marcación no se
+          guardan en la cotización, así que su costo vuelve como costo adicional
+          del producto. Revisa los márgenes y las retenciones para esta nueva
+          cotización: estos controles comienzan con los valores de la calculadora.
+        </div>
+      )}
+
+      <h2>Calculadora visual (estimacion)</h2>
+      {esAdmin ? (
+        <CalculadoraCotizador
+          key={`${sp.desde_cotizacion ?? "nueva"}:${idOrganizacionPreseleccionada}`}
+          proveedoresIniciales={proveedoresCalculadora}
+          organizacionesIniciales={organizacionesCotizador}
+          esAdmin={esAdmin}
+          lineasIniciales={origen?.lineas}
+          idOrganizacionInicial={idOrganizacionPreseleccionada}
+          notasIniciales={notasIniciales}
+        />
+      ) : (
+        <div className="aviso-caja neutro">
+          La calculadora visual expone costos, desgaste y margen: solo esta disponible
+          para rol ADMIN. Usa el flujo proveedor-first de abajo.
+        </div>
+      )}
+
+      <details open={flujoEnUso}>
+        <summary>
+          <h2 style={{ display: "inline-block", margin: "18px 0 10px" }}>
+            Flujo proveedor-first (emitir cotizacion real)
+          </h2>
+        </summary>
+
+      <form action={previsualizarCotizacionProveedor} noValidate>
         <h2>1. Cliente y proveedor</h2>
         <div className="tarjeta">
           <div className="filtros">
             <select name="id_organizacion" defaultValue={sp.id_organizacion ?? ""} disabled={!puedeCotizar}>
               <option value="">Sin cliente asociado</option>
-              {organizaciones.map((o) => (
+              {organizacionesCotizador.map((o) => (
                 <option key={o.id_organizacion} value={o.id_organizacion}>
                   {o.nombre_legal}
                   {o.nit ? ` - ${o.nit}` : ""}
                 </option>
               ))}
             </select>
-            <input
-              name="q_proveedor"
-              placeholder="Buscar proveedor"
-              defaultValue={sp.q_proveedor ?? ""}
+            <SelectAutoSubmit
+              name="id_proveedor"
+              defaultValue={sp.id_proveedor ?? ""}
               disabled={!puedeCotizar}
-            />
-            <select name="id_proveedor" defaultValue={sp.id_proveedor ?? ""} disabled={!puedeCotizar}>
+              ariaLabel="Proveedor"
+              action={prepararCotizacionProveedor}
+            >
               <option value="">Proveedor</option>
               {proveedores.map((p) => (
                 <option key={p.id_proveedor} value={p.id_proveedor}>
@@ -292,26 +432,19 @@ export default async function PaginaCotizador({
                   {` (${p.productos})`}
                 </option>
               ))}
-            </select>
-            <button formAction={prepararCotizacionProveedor} type="submit" disabled={!puedeCotizar}>
-              Buscar proveedor
-            </button>
+            </SelectAutoSubmit>
           </div>
         </div>
 
         <h2>2. Producto del proveedor</h2>
         <div className="tarjeta">
           <div className="filtros">
-            <input
-              name="q_producto"
-              placeholder="Buscar: mug, termo, agenda, esfero..."
-              defaultValue={sp.q_producto ?? ""}
-              disabled={!puedeCotizar || !sp.id_proveedor}
-            />
-            <select
+            <SelectAutoSubmit
               name="id_producto_proveedor"
               defaultValue={sp.id_producto_proveedor ?? ""}
               disabled={!puedeCotizar || productosProveedor.length === 0}
+              ariaLabel="Producto del proveedor"
+              action={prepararCotizacionProveedor}
             >
               <option value="">Producto del proveedor</option>
               {productosProveedor.map((p) => (
@@ -321,20 +454,41 @@ export default async function PaginaCotizador({
                   {p.ultimo_precio ? ` (${cop(p.ultimo_precio)})` : ""}
                 </option>
               ))}
-            </select>
+            </SelectAutoSubmit>
+            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+              <input
+                name="q_producto"
+                placeholder="Filtrar..."
+                defaultValue={sp.q_producto ?? ""}
+                disabled={!puedeCotizar || !sp.id_proveedor}
+                style={{ flex: 1 }}
+              />
+              <button
+                formAction={prepararCotizacionProveedor}
+                type="submit"
+                formNoValidate
+                disabled={!puedeCotizar || !sp.id_proveedor}
+                title="Filtrar productos del proveedor y aplicar la cantidad escrita abajo"
+              >
+                Filtrar / aplicar cantidad
+              </button>
+            </div>
             <input
               name="cantidad"
               type="number"
               min="1"
               placeholder="Cantidad"
               defaultValue={sp.cantidad ?? ""}
-              required
               disabled={!puedeCotizar}
             />
-            <button formAction={prepararCotizacionProveedor} type="submit" disabled={!puedeCotizar || !sp.id_proveedor}>
-              Buscar producto/ofertas
-            </button>
           </div>
+
+          {!sp.cantidad && (
+            <p style={{ fontSize: 13, color: "var(--texto-suave)", marginBottom: 0 }}>
+              Escribi la cantidad y hace click en &quot;Filtrar / aplicar cantidad&quot; -
+              recien ahi se habilitan la tecnica y el calculo de precio.
+            </p>
+          )}
 
           {productoSeleccionado && (
             <p style={{ marginBottom: 0, color: "var(--texto-suave)" }}>
@@ -359,7 +513,6 @@ export default async function PaginaCotizador({
               <input
                 name="manual_nombre_producto"
                 placeholder="Producto: mug 11 oz, tula, agenda..."
-                required
                 disabled={!puedeCotizar}
               />
               <input name="manual_sku_proveedor" placeholder="SKU proveedor opcional" disabled={!puedeCotizar} />
@@ -370,7 +523,6 @@ export default async function PaginaCotizador({
                 min="1"
                 step="0.01"
                 placeholder="Costo proveedor"
-                required
                 disabled={!puedeCotizar}
               />
               <select name="manual_moneda" defaultValue="COP" disabled={!puedeCotizar}>
@@ -425,11 +577,12 @@ export default async function PaginaCotizador({
         <h2>3. Costo proveedor y tecnica</h2>
         <div className="tarjeta">
           <div className="filtros">
-            <select
+            <SelectAutoSubmit
               name="id_precio_proveedor_snapshot"
               defaultValue={sp.id_precio_proveedor_snapshot ?? ""}
               disabled={!puedeCotizar || ofertas.length === 0}
-              required
+              ariaLabel="Oferta / costo proveedor"
+              action={previsualizarCotizacionProveedor}
             >
               <option value="">Oferta / costo proveedor</option>
               {ofertas.map((o) => (
@@ -440,17 +593,20 @@ export default async function PaginaCotizador({
                   {o.vigente ? "" : " (no vigente)"}
                 </option>
               ))}
-            </select>
+            </SelectAutoSubmit>
             <input
               name="q_tecnica"
-              placeholder="Buscar tecnica: DTF, sublimacion, laser..."
+              placeholder="Filtrar técnicas..."
               defaultValue={sp.q_tecnica ?? ""}
               disabled={!puedeCotizar || !sp.cantidad}
+              style={{ flex: 1 }}
             />
-            <select
+            <SelectAutoSubmit
               name="id_snapshot_tecnica"
               defaultValue={sp.id_snapshot_tecnica ?? ""}
               disabled={!puedeCotizar || tecnicas.length === 0}
+              ariaLabel="Tecnica de marcacion"
+              action={previsualizarCotizacionProveedor}
             >
               <option value="">Sin tecnica de marcacion</option>
               {tecnicas.map((t) => (
@@ -459,10 +615,7 @@ export default async function PaginaCotizador({
                   {t.size_label ? ` - ${t.size_label}` : ""}
                 </option>
               ))}
-            </select>
-            <button formAction={prepararCotizacionProveedor} type="submit" disabled={!puedeCotizar || !sp.cantidad}>
-              Buscar tecnicas
-            </button>
+            </SelectAutoSubmit>
           </div>
 
           {ofertaSeleccionada && (
@@ -536,13 +689,11 @@ export default async function PaginaCotizador({
               <input
                 name="manual_nombre_proveedor_tecnica"
                 placeholder="Proveedor tecnica: Surtivinilos, taller..."
-                required
                 disabled={!puedeCotizar}
               />
               <input
                 name="manual_codigo_tecnica"
                 placeholder="Tecnica: DTF, SUBLIMACION, LASER..."
-                required
                 disabled={!puedeCotizar}
               />
               <input
@@ -551,7 +702,6 @@ export default async function PaginaCotizador({
                 min="1"
                 step="0.01"
                 placeholder="Costo tecnica"
-                required
                 disabled={!puedeCotizar}
               />
               <select name="manual_moneda_tecnica" defaultValue="COP" disabled={!puedeCotizar}>
@@ -639,10 +789,22 @@ export default async function PaginaCotizador({
             <button
               type="submit"
               disabled={!puedeCotizar || !sp.id_precio_proveedor_snapshot || !sp.cantidad}
+              title={
+                !sp.cantidad
+                  ? "Falta aplicar la cantidad en el paso 2"
+                  : !sp.id_precio_proveedor_snapshot
+                    ? "Falta elegir una oferta de proveedor en el paso 3"
+                    : undefined
+              }
             >
               Calcular precio
             </button>
           </div>
+          {sp.cantidad && !sp.id_precio_proveedor_snapshot && (
+            <p style={{ fontSize: 13, color: "var(--texto-suave)", marginTop: "0.5rem", marginBottom: 0 }}>
+              Elegi una oferta de proveedor en el paso 3 para habilitar el calculo.
+            </p>
+          )}
         </div>
       </form>
 
@@ -691,7 +853,7 @@ export default async function PaginaCotizador({
               Total calculado: <strong>{cop(previewTotal)}</strong>. El PDF no mostrara costos ni margen.
             </div>
 
-            <form action={crearCotizacionProveedor} className="filtros">
+            <form action={crearCotizacionProveedor} className="filtros" noValidate>
               <input type="hidden" name="idempotency_key" value={idempotencyKey} />
               <input type="hidden" name="id_organizacion" value={sp.id_organizacion ?? ""} />
               <input type="hidden" name="id_proveedor" value={sp.id_proveedor ?? ""} />
@@ -717,6 +879,7 @@ export default async function PaginaCotizador({
           </>
         )}
       </div>
+      </details>
 
       <h2>Ultimas cotizaciones</h2>
       <div className="tabla-contenedor">

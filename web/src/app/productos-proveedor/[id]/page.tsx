@@ -7,6 +7,44 @@ export const dynamic = "force-dynamic";
 
 const cop = (v: number) => "$" + v.toLocaleString("es-CO", { maximumFractionDigits: 0 });
 
+const miles = (v: number) => v.toLocaleString("es-CO");
+
+/**
+ * Presentacion y costo unitario interno de una observacion de precio.
+ *
+ * "Precio mas reciente: $18.000 / Unidad: —" no alcanza: no distingue si esos
+ * $18.000 son por unidad o por un paquete de 10, que es exactamente la
+ * diferencia entre cotizar bien y cotizar 10 veces mal. Se calcula con la
+ * MISMA formula que usa el motor de cotizacion
+ * (fn_quote_calculate_supplier_components_core) y que el selector de ofertas
+ * (fn_consola_ofertas_producto_proveedor):
+ *   costo_unitario = PACK con cantidad_pack > 0 ? precio / cantidad_pack : precio
+ */
+const desglosePrecio = (s: {
+  precio_publicado: number | string;
+  unidad_compra: string | null;
+  cantidad_pack: number | string | null;
+}) => {
+  const precio = Number(s.precio_publicado);
+  const pack = Number(s.cantidad_pack ?? NaN);
+  const esPack = s.unidad_compra === "PACK" && Number.isFinite(pack) && pack > 0;
+  const contenido = esPack ? pack : 1;
+  const unidadTexto =
+    s.unidad_compra === "METER"
+      ? "metro"
+      : s.unidad_compra === "SHEET"
+        ? "hoja"
+        : esPack
+          ? "paquete"
+          : "unidad";
+  return {
+    esPack,
+    contenido,
+    unidadTexto,
+    costoUnitario: esPack ? precio / pack : precio,
+  };
+};
+
 export default async function PaginaProductoProveedor({
   params,
 }: {
@@ -119,6 +157,58 @@ export default async function PaginaProductoProveedor({
         </dl>
       </div>
 
+      <h2>Precio y presentacion</h2>
+      {historico.length === 0 ? (
+        <div className="aviso-caja neutro">Sin precios observados para este producto.</div>
+      ) : (
+        (() => {
+          const ultimo = historico[0];
+          const d = desglosePrecio(ultimo);
+          return (
+            <div
+              className="tarjeta"
+              data-testid="producto-precio-resumen"
+              data-unidad-compra={ultimo.unidad_compra ?? "UNIT"}
+              data-contenido={d.contenido}
+              data-precio-proveedor={Math.round(Number(ultimo.precio_publicado))}
+              data-costo-unitario={Math.round(d.costoUnitario)}
+            >
+              <dl className="datos">
+                <dt>Precio proveedor</dt>
+                <dd>
+                  <strong>{cop(Number(ultimo.precio_publicado))}</strong> / {d.unidadTexto}
+                </dd>
+                <dt>Contenido</dt>
+                <dd>
+                  {miles(d.contenido)} unidad{d.contenido === 1 ? "" : "es"}
+                </dd>
+                <dt>Costo unitario interno</dt>
+                <dd>
+                  <strong>{cop(d.costoUnitario)}</strong> / unidad
+                  {d.esPack && (
+                    <span style={{ color: "var(--texto-suave)" }}>
+                      {" "}
+                      ({cop(Number(ultimo.precio_publicado))} ÷ {miles(d.contenido)})
+                    </span>
+                  )}
+                </dd>
+                <dt>Observado</dt>
+                <dd>{new Date(ultimo.observado_en).toLocaleDateString("es-CO")}</dd>
+              </dl>
+              {!ultimo.unidad_compra && (
+                <div className="aviso-caja">
+                  Esta observacion no tiene registrada la unidad de compra, asi que se
+                  asume <strong>1 unidad</strong>. Si el proveedor la vende por paquete,
+                  el costo unitario que se use para cotizar va a estar inflado: hay que
+                  registrar una observacion nueva con <code>unidad_compra = PACK</code> y{" "}
+                  <code>cantidad_pack</code>.
+                </div>
+              )}
+            </div>
+          );
+        })()
+      )}
+
       <h2>Historico de precios observados ({historico.length})</h2>
       <div className="aviso-caja neutro">
         Esta tabla es de solo lectura por diseno. Un cambio de precio no edita un
@@ -130,10 +220,11 @@ export default async function PaginaProductoProveedor({
           <thead>
             <tr>
               <th>Observado</th>
-              <th className="num">Precio</th>
+              <th className="num">Precio proveedor</th>
               <th>Moneda</th>
               <th>Unidad</th>
-              <th className="num">Cantidad pack</th>
+              <th className="num">Contenido</th>
+              <th className="num">Costo unitario interno</th>
               <th className="num">Minimo</th>
               <th>Formato</th>
               <th>Disponibilidad</th>
@@ -144,10 +235,13 @@ export default async function PaginaProductoProveedor({
             {historico.map((s) => (
               <tr key={s.id_snapshot}>
                 <td>{new Date(s.observado_en).toLocaleDateString("es-CO")}</td>
-                <td className="num">{cop(s.precio_publicado)}</td>
+                <td className="num">
+                  {cop(s.precio_publicado)} / {desglosePrecio(s).unidadTexto}
+                </td>
                 <td>{s.moneda}</td>
                 <td>{s.unidad_compra ?? "—"}</td>
-                <td className="num">{s.cantidad_pack ?? "—"}</td>
+                <td className="num">{miles(desglosePrecio(s).contenido)} und</td>
+                <td className="num">{cop(desglosePrecio(s).costoUnitario)}</td>
                 <td className="num">{s.minimo_compra ?? "—"}</td>
                 <td>
                   {s.ancho_cm && s.alto_cm ? `${s.ancho_cm} × ${s.alto_cm} cm` : "—"}
@@ -166,7 +260,7 @@ export default async function PaginaProductoProveedor({
             ))}
             {historico.length === 0 && (
               <tr>
-                <td colSpan={9} style={{ color: "var(--texto-suave)" }}>
+                <td colSpan={10} style={{ color: "var(--texto-suave)" }}>
                   Sin precios observados para este producto.
                 </td>
               </tr>

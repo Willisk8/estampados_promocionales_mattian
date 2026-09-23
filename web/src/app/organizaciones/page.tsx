@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FiltrosUbicacion } from "@/componentes/filtros-ubicacion";
 import { crearClienteServidor, obtenerSesionConsola } from "@/lib/supabase/servidor";
 import { SinAcceso } from "@/componentes/sin-acceso";
 
@@ -110,20 +111,6 @@ export default async function PaginaOrganizaciones({
     departamento: string;
     municipio: string | null;
   }>;
-  const departamentos = [...new Set(ubicaciones.map((u) => u.departamento))].sort();
-  const ciudades = [
-    ...new Set(
-      ubicaciones
-        .filter((u) =>
-          sp.depto
-            ? u.departamento.toLowerCase().includes(sp.depto.toLowerCase())
-            : true,
-        )
-        .map((u) => u.municipio)
-        .filter((m): m is string => Boolean(m)),
-    ),
-  ].sort();
-
   const desactualizadas = filas.filter(
     (f) => (f.anios_desde_reporte ?? 0) >= ANIOS_PARA_ALERTA,
   ).length;
@@ -150,22 +137,7 @@ export default async function PaginaOrganizaciones({
 
       <form className="filtros" method="get">
         <input name="q" placeholder="Nombre o NIT" defaultValue={sp.q ?? ""} />
-        <select name="depto" defaultValue={sp.depto ?? ""}>
-          <option value="">Todo departamento</option>
-          {departamentos.map((d) => (
-            <option key={d} value={d}>
-              {d}
-            </option>
-          ))}
-        </select>
-        <select name="ciudad" defaultValue={sp.ciudad ?? ""}>
-          <option value="">Toda ciudad</option>
-          {ciudades.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
+        <FiltrosUbicacion key={`${sp.depto ?? ""}:${sp.ciudad ?? ""}`} ubicaciones={ubicaciones} departamento={sp.depto} ciudad={sp.ciudad} />
         <select name="tipo" defaultValue={sp.tipo ?? ""}>
           <option value="">Todo tipo</option>
           {TIPOS_ORGANIZACION.map(([codigo, etiqueta]) => (
